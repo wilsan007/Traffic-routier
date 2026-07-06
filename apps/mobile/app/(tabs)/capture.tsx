@@ -2,7 +2,15 @@ import { useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import { API_URL, getToken } from '../../lib/api';
+import { api, API_URL, getToken } from '../../lib/api';
+
+interface InfractionTypeOption {
+  id: string;
+  label: string;
+  category?: string;
+  baseAmount: number;
+  points: number;
+}
 
 interface CaptureResult {
   capture: {
@@ -22,6 +30,37 @@ export default function CaptureScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CaptureResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Verbalisation terrain
+  const [types, setTypes] = useState<InfractionTypeOption[] | null>(null);
+  const [pvCreated, setPvCreated] = useState<string | null>(null);
+  const [pvLoading, setPvLoading] = useState(false);
+
+  async function openVerbalisation() {
+    if (types) {
+      setTypes(null);
+      return;
+    }
+    const list = await api.get<InfractionTypeOption[]>('/infraction-types?activeOnly=true');
+    setTypes(list);
+  }
+
+  async function verbalize(typeId: string) {
+    if (!result?.vehicleMatch) return;
+    setPvLoading(true);
+    try {
+      const pv = await api.post<{ reference: string }>('/infractions', {
+        vehicleId: result.vehicleMatch.id,
+        typeId,
+        captureId: result.capture.id,
+      });
+      setPvCreated(pv.reference);
+      setTypes(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verbalisation impossible');
+    } finally {
+      setPvLoading(false);
+    }
+  }
 
   if (!permission) return <View style={styles.center}><ActivityIndicator /></View>;
 
@@ -80,6 +119,8 @@ export default function CaptureScreen() {
     setPhotoUri(null);
     setResult(null);
     setError(null);
+    setTypes(null);
+    setPvCreated(null);
   }
 
   if (photoUri) {
@@ -119,6 +160,31 @@ export default function CaptureScreen() {
             )}
           </View>
         )}
+        {/* Verbalisation depuis la capture (PV terrain) */}
+        {result?.vehicleMatch && !pvCreated && (
+          <TouchableOpacity style={styles.verbalizeButton} onPress={openVerbalisation} disabled={pvLoading}>
+            <Text style={styles.actionText}>{types ? 'Fermer le barème' : '📝 Verbaliser ce véhicule'}</Text>
+          </TouchableOpacity>
+        )}
+        {types && !pvCreated && (
+          <View style={styles.typeList}>
+            {types.map((t) => (
+              <TouchableOpacity key={t.id} style={styles.typeItem} onPress={() => verbalize(t.id)} disabled={pvLoading}>
+                <Text style={styles.typeLabel}>{t.label}</Text>
+                <Text style={styles.typeMeta}>
+                  {t.baseAmount} € {t.points ? `· ${t.points} pt(s)` : ''}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        {pvCreated && (
+          <View style={styles.pvBox}>
+            <Text style={styles.pvTitle}>✓ PV créé : {pvCreated}</Text>
+            <Text style={styles.pvHint}>Soumis à validation du superviseur, avec la photo en preuve.</Text>
+          </View>
+        )}
+
         <TouchableOpacity style={styles.actionButton} onPress={reset}>
           <Text style={styles.actionText}>Nouvelle capture</Text>
         </TouchableOpacity>
@@ -166,4 +232,20 @@ const styles = StyleSheet.create({
   alertItem: { color: '#b91c1c' },
   actionButton: { backgroundColor: '#2f5fdb', borderRadius: 12, padding: 16, alignItems: 'center' },
   actionText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  verbalizeButton: { backgroundColor: '#0f1f4a', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 12 },
+  typeList: { backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
+  typeItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  typeLabel: { flex: 1, color: '#0f172a', fontSize: 14, marginRight: 8 },
+  typeMeta: { color: '#64748b', fontSize: 12, fontWeight: '600' },
+  pvBox: { backgroundColor: '#ecfdf5', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#a7f3d0' },
+  pvTitle: { color: '#047857', fontWeight: '700' },
+  pvHint: { color: '#059669', fontSize: 12, marginTop: 2 },
 });
