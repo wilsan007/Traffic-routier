@@ -1,0 +1,601 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  ADMIN
+  SUPERVISOR
+  OFFICER
+  OPERATOR // opérateur centre de commandement
+  CASHIER // gestionnaire paiements/guichet
+  TECHNICIAN // technicien caméras/appareils
+  AUDITOR // lecture seule + journal d'audit
+}
+
+enum LicenseStatus {
+  VALID
+  SUSPENDED
+  REVOKED
+  EXPIRED
+  UNKNOWN
+}
+
+enum InsuranceStatus {
+  VALID
+  EXPIRED
+  UNKNOWN
+}
+
+enum CameraType {
+  FIXED
+  MOBILE
+}
+
+enum InfractionSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+// Cycle de vie complet d'un PV :
+// DRAFT -> PENDING_REVIEW -> VALIDATED -> NOTIFIED -> PAID | CONTESTED -> CLOSED
+// REJECTED (par le superviseur) et CANCELLED (annulation) sont terminaux.
+// PENDING est conservé pour compatibilité (équivalent PENDING_REVIEW).
+enum InfractionStatus {
+  DRAFT
+  PENDING
+  PENDING_REVIEW
+  VALIDATED
+  REJECTED
+  NOTIFIED
+  PAID
+  CONTESTED
+  CANCELLED
+  CLOSED
+}
+
+enum PaymentMethod {
+  CARD_ONLINE
+  COUNTER_CARD
+  CASH
+  TRANSFER
+}
+
+enum PaymentStatus {
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+enum DisputeStatus {
+  PENDING
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+}
+
+enum TollTxStatus {
+  PENDING
+  PAID
+  INVOICED
+}
+
+enum HotlistReason {
+  STOLEN_VEHICLE
+  WANTED_PERSON
+  BOLO
+  SUSPENDED_REGISTRATION
+  AMBER_ALERT
+  CLONED_PLATE
+  REPEATED_PASSAGE
+  SPEED_VIOLATION
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  NEW
+  ACKNOWLEDGED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum SearchType {
+  PLATE
+  OWNER
+  VIN
+}
+
+// ---------- Core reference data ----------
+
+// Région/juridiction : format de plaque configurable (feature: config générique multi-pays)
+model Region {
+  id               String    @id @default(uuid())
+  code             String    @unique
+  name             String
+  plateFormatRegex String // ex: "^[A-Z]{2}-\\d{3}-[A-Z]{2}$"
+  plateFormatHint  String? // ex: "AA-123-AA"
+  createdAt        DateTime  @default(now())
+
+  vehicles Vehicle[]
+  cameras  Camera[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  badgeNumber  String?  @unique
+  role         Role     @default(OFFICER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  capturesAsOfficer   Capture[]        @relation("CaptureOfficer")
+  capturesVerified    Capture[]        @relation("CaptureVerifiedBy")
+  infractionsIssued   Infraction[]
+  hotlistEntries      HotlistEntry[]
+  alertsAcknowledged  Alert[]
+  casesCreated        Case[]           @relation("CaseCreatedBy")
+  casesAssigned       Case[]           @relation("CaseAssignedTo")
+  caseNotes           CaseNote[]
+  caseAttachments     CaseAttachment[]
+  auditLogs           AuditLog[]
+  searches            Search[]
+  infractionsValidated Infraction[]   @relation("InfractionValidatedBy")
+  paymentsRecorded    Payment[]
+  disputesDecided     Dispute[]
+  location            AgentLocation?
+  messagesSent        Message[]        @relation("MessageFrom")
+  messagesReceived    Message[]        @relation("MessageTo")
+
+  expoPushToken String? // jeton de notification push mobile (Expo)
+
+  @@index([role])
+}
+
+// Dernière position connue de chaque agent en service (carte du centre de commandement)
+model AgentLocation {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latitude  Float
+  longitude Float
+  heading   Float?
+  onDuty    Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// Messagerie agent <-> centre de commandement (toId null = canal général)
+model Message {
+  id        String    @id @default(uuid())
+  fromId    String
+  from      User      @relation("MessageFrom", fields: [fromId], references: [id])
+  toId      String?
+  to        User?     @relation("MessageTo", fields: [toId], references: [id])
+  content   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([toId, createdAt])
+  @@index([createdAt])
+}
+
+// ---------- Vehicles & owners ----------
+
+model Owner {
+  id                 String        @id @default(uuid())
+  firstName          String
+  lastName           String
+  dateOfBirth        DateTime?
+  nationalId         String?       @unique
+  address            String?
+  phone              String?
+  licenseNumber      String?       @unique
+  licenseStatus      LicenseStatus @default(UNKNOWN)
+  licenseExpiresAt   DateTime?
+  photoUrl           String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  ownerships   VehicleOwnership[]
+  infractions  Infraction[]
+  cases        Case[]
+
+  @@index([lastName, firstName])
+}
+
+model Vehicle {
+  id                            String           @id @default(uuid())
+  plateNumber                   String           @unique
+  regionId                      String
+  region                        Region           @relation(fields: [regionId], references: [id])
+  make                          String?
+  model                         String?
+  color                         String?
+  year                          Int?
+  vin                           String?          @unique
+  registeredAt                  DateTime?
+  insuranceStatus               InsuranceStatus  @default(UNKNOWN)
+  insuranceExpiresAt            DateTime?
+  technicalControlExpiresAt     DateTime?
+  stolen                        Boolean          @default(false)
+  fleetId                       String?
+  fleet                         Fleet?           @relation(fields: [fleetId], references: [id])
+  createdAt                     DateTime         @default(now())
+  updatedAt                     DateTime         @updatedAt
+
+  ownerships       VehicleOwnership[]
+  captures         Capture[]
+  infractions      Infraction[]
+  cases            Case[]
+  tollTransactions TollTransaction[]
+
+  @@index([plateNumber])
+  @@index([fleetId])
+}
+
+// Flotte de véhicules (entreprise, administration) — vue consolidée
+model Fleet {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  contactName  String?
+  contactEmail String?
+  createdAt    DateTime @default(now())
+
+  vehicles Vehicle[]
+}
+
+// Historique des propriétaires successifs
+model VehicleOwnership {
+  id        String    @id @default(uuid())
+  vehicleId String
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  ownerId   String
+  owner     Owner     @relation(fields: [ownerId], references: [id])
+  startDate DateTime  @default(now())
+  endDate   DateTime?
+
+  @@index([vehicleId])
+  @@index([ownerId])
+}
+
+// ---------- Capture / ALPR ----------
+
+model Camera {
+  id        String     @id @default(uuid())
+  name      String
+  type      CameraType @default(FIXED)
+  regionId  String
+  region    Region     @relation(fields: [regionId], references: [id])
+  latitude  Float?
+  longitude Float?
+  streamUrl String? // URL RTSP/HTTP du flux vidéo pour le traitement continu
+  recordingEnabled Boolean @default(false) // enregistrement du flux (MediaMTX)
+  maxSpeedKmh Int? // limite de vitesse sur la section surveillée (pour estimation entre caméras)
+  lastSeenAt DateTime? // dernière activité (capture ou frame) — diagnostic en ligne/hors ligne
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  captures  Capture[]
+  tollZones TollZone[]
+}
+
+// ---------- Péage light ----------
+
+// Zone de péage : chaque passage détecté (caméra liée ou géolocalisation)
+// génère une transaction au tarif configuré.
+model TollZone {
+  id              String   @id @default(uuid())
+  name            String
+  latitude        Float?
+  longitude       Float?
+  radiusMeters    Float    @default(300)
+  cameraId        String?
+  camera          Camera?  @relation(fields: [cameraId], references: [id])
+  pricePerPassage Float
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  transactions TollTransaction[]
+}
+
+model TollTransaction {
+  id          String       @id @default(uuid())
+  zoneId      String
+  zone        TollZone     @relation(fields: [zoneId], references: [id])
+  captureId   String?
+  vehicleId   String?
+  vehicle     Vehicle?     @relation(fields: [vehicleId], references: [id])
+  plateNumber String
+  amount      Float
+  status      TollTxStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+
+  @@index([zoneId, createdAt])
+  @@index([plateNumber])
+  @@index([status])
+}
+
+// Zone sensible (commissariat, école, site protégé…) pour la détection de
+// passages répétés suspects.
+model SensitiveZone {
+  id           String   @id @default(uuid())
+  name         String
+  latitude     Float
+  longitude    Float
+  radiusMeters Float    @default(500)
+  createdAt    DateTime @default(now())
+}
+
+model Capture {
+  id                    String   @id @default(uuid())
+  cameraId              String?
+  camera                Camera?  @relation(fields: [cameraId], references: [id])
+  officerId             String?
+  officer               User?    @relation("CaptureOfficer", fields: [officerId], references: [id])
+  imageUrl              String
+  plateNumberRaw        String
+  plateNumberNormalized String
+  confidence            Float
+  vehicleId             String?
+  vehicle               Vehicle? @relation(fields: [vehicleId], references: [id])
+  latitude              Float?
+  longitude             Float?
+  capturedAt            DateTime @default(now())
+  verified              Boolean  @default(false)
+  verifiedById          String?
+  verifiedBy            User?    @relation("CaptureVerifiedBy", fields: [verifiedById], references: [id])
+  createdAt             DateTime @default(now())
+
+  alerts      Alert[]
+  infractions Infraction[]
+
+  @@index([plateNumberNormalized])
+  @@index([capturedAt])
+}
+
+// ---------- Infractions ----------
+
+// Barème des infractions : catalogue paramétrable (type, montants, points, délais)
+model InfractionType {
+  id              String   @id @default(uuid())
+  code            String   @unique // ex: "EXCES_VITESSE_20"
+  label           String
+  description     String?
+  category        String? // vitesse, stationnement, feux, assurance…
+  baseAmount      Float
+  reducedAmount   Float? // montant minoré (paiement rapide)
+  increasedAmount Float? // montant majoré (après échéance)
+  points          Int      @default(0)
+  reducedDays     Int      @default(15) // délai du tarif minoré après notification
+  dueDays         Int      @default(45) // délai avant majoration
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  infractions Infraction[]
+}
+
+model Infraction {
+  id              String             @id @default(uuid())
+  reference       String?            @unique // n° public du PV, ex: PV-2026-000123
+  vehicleId       String
+  vehicle         Vehicle            @relation(fields: [vehicleId], references: [id])
+  ownerId         String?
+  owner           Owner?             @relation(fields: [ownerId], references: [id])
+  officerId       String
+  officer         User               @relation(fields: [officerId], references: [id])
+  captureId       String?
+  capture         Capture?           @relation(fields: [captureId], references: [id])
+  typeId          String?
+  infractionType  InfractionType?    @relation(fields: [typeId], references: [id])
+  type            String // libellé (copie du barème ou saisie libre)
+  description     String?
+  severity        InfractionSeverity @default(MINOR)
+  fineAmount      Float?
+  amountDue       Float? // montant courant exigible (minoré/normal/majoré)
+  points          Int?
+  status          InfractionStatus   @default(DRAFT)
+  occurredAt      DateTime           @default(now())
+  validatedById   String?
+  validatedBy     User?              @relation("InfractionValidatedBy", fields: [validatedById], references: [id])
+  validatedAt     DateTime?
+  rejectionReason String?
+  notifiedAt      DateTime?
+  dueDate         DateTime? // échéance avant majoration
+  closedAt        DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  payments      Payment[]
+  dispute       Dispute?
+  notifications NotificationLog[]
+
+  @@index([vehicleId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([occurredAt])
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  infractionId  String
+  infraction    Infraction    @relation(fields: [infractionId], references: [id])
+  amount        Float
+  method        PaymentMethod
+  status        PaymentStatus @default(COMPLETED)
+  receiptNumber String        @unique // ex: REC-2026-000042
+  payerName     String?
+  recordedById  String? // agent guichet (null = paiement en ligne citoyen)
+  recordedBy    User?         @relation(fields: [recordedById], references: [id])
+  createdAt     DateTime      @default(now())
+
+  @@index([infractionId])
+  @@index([createdAt])
+}
+
+model Dispute {
+  id             String        @id @default(uuid())
+  infractionId   String        @unique
+  infraction     Infraction    @relation(fields: [infractionId], references: [id])
+  reason         String
+  details        String?
+  contactEmail   String?
+  attachmentUrls Json? // liste d'URLs de pièces jointes
+  status         DisputeStatus @default(PENDING)
+  decision       String?
+  decidedById    String?
+  decidedBy      User?         @relation(fields: [decidedById], references: [id])
+  decidedAt      DateTime?
+  createdAt      DateTime      @default(now())
+
+  @@index([status])
+}
+
+// Journal des notifications envoyées (email/courrier simulés)
+model NotificationLog {
+  id           String      @id @default(uuid())
+  infractionId String?
+  infraction   Infraction? @relation(fields: [infractionId], references: [id])
+  channel      String // EMAIL, MAIL, SMS, PUSH
+  recipient    String
+  subject      String
+  body         String
+  status       String      @default("SENT")
+  sentAt       DateTime    @default(now())
+
+  @@index([infractionId])
+}
+
+// ---------- Hotlist / alerts ----------
+
+model HotlistEntry {
+  id           String        @id @default(uuid())
+  plateNumber  String
+  reason       HotlistReason
+  priority     Priority      @default(MEDIUM)
+  notes        String?
+  active       Boolean       @default(true)
+  createdById  String
+  createdBy    User          @relation(fields: [createdById], references: [id])
+  createdAt    DateTime      @default(now())
+  expiresAt    DateTime?
+
+  alerts Alert[]
+
+  @@index([plateNumber])
+  @@index([active])
+}
+
+model Alert {
+  id               String       @id @default(uuid())
+  hotlistEntryId   String
+  hotlistEntry     HotlistEntry @relation(fields: [hotlistEntryId], references: [id])
+  captureId        String
+  capture          Capture      @relation(fields: [captureId], references: [id])
+  status           AlertStatus  @default(NEW)
+  acknowledgedById String?
+  acknowledgedBy   User?        @relation(fields: [acknowledgedById], references: [id])
+  createdAt        DateTime     @default(now())
+  resolvedAt       DateTime?
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ---------- Cases / incident reports ----------
+
+model Case {
+  id            String      @id @default(uuid())
+  title         String
+  description   String?
+  status        CaseStatus  @default(OPEN)
+  createdById   String
+  createdBy     User        @relation("CaseCreatedBy", fields: [createdById], references: [id])
+  assignedToId  String?
+  assignedTo    User?       @relation("CaseAssignedTo", fields: [assignedToId], references: [id])
+  vehicleId     String?
+  vehicle       Vehicle?    @relation(fields: [vehicleId], references: [id])
+  ownerId       String?
+  owner         Owner?      @relation(fields: [ownerId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  notes       CaseNote[]
+  attachments CaseAttachment[]
+
+  @@index([status])
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model CaseAttachment {
+  id           String   @id @default(uuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  url          String
+  type         String?
+  uploadedById String
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// ---------- Audit & search traceability ----------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Search {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  query       String
+  type        SearchType
+  resultCount Int        @default(0)
+  createdAt   DateTime   @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

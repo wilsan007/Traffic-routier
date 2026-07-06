@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "TrafficGuard",
+    "slug": "trafficguard-mobile",
+    "scheme": "trafficguard",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "local.trafficguard.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "local.trafficguard.mobile",
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TrafficGuard a besoin de la caméra pour capturer les plaques d'immatriculation."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "TrafficGuard utilise la localisation pour géolocaliser les captures."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:3001",
+      "wsUrl": "ws://localhost:3001",
+      "router": {},
+      "eas": {
+        "projectId": "34610b35-c7c4-4ed1-a013-5aa0ddb6f2a2"
+      }
+    },
+    "owner": "wailsan007"
+  }
+}

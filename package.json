@@ -1,0 +1,35 @@
+{
+  "name": "trafficguard",
+  "private": true,
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "apps/mobile",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=apps/api",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:mobile": "npm run start --workspace=apps/mobile",
+    "build:shared": "npm run build --workspace=packages/shared",
+    "prisma:generate": "npm run prisma:generate --workspace=apps/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "prisma:seed": "npm run prisma:seed --workspace=apps/api"
+  },
+  "allowScripts": {
+    "@nestjs/core@10.4.22": true,
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "argon2@0.41.1": true,
+    "aws-sdk@2.1693.0": true,
+    "prisma@5.22.0": true,
+    "fsevents@2.3.3": true
+  },
+  "dependencies": {
+    "expo": "~54.0.0"
+  },
+  "overrides": {
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.0"
+  }
+}

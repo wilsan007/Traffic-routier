@@ -1,0 +1,11 @@
+ALTER TABLE "Camera" ADD COLUMN "streamUrl" TEXT;
+
+CREATE TABLE "SensitiveZone" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "latitude" DOUBLE PRECISION NOT NULL,
+    "longitude" DOUBLE PRECISION NOT NULL,
+    "radiusMeters" DOUBLE PRECISION NOT NULL DEFAULT 500,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "SensitiveZone_pkey" PRIMARY KEY ("id")
+);
