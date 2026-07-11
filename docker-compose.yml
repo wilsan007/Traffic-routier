@@ -64,8 +64,15 @@ services:
     build:
       context: ./apps/ml
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    # Pas de mapping de port vers l'hôte : ce service n'est appelé que par
+    # 'api' sur le réseau Docker interne (http://ml:8000), et son seul
+    # mécanisme d'authentification est SERVICE_API_KEY (défense en
+    # profondeur). Publier ce port sur l'hôte (comme c'était le cas
+    # auparavant) l'exposait à quiconque atteint la machine, sans qu'aucune
+    # authentification ne soit alors nécessaire pour lancer des flux vidéo
+    # (cv2.VideoCapture sur une URL arbitraire) ou consommer le pipeline de
+    # détection. Réactiver temporairement pour du débogage local si besoin :
+    # ports: ["8000:8000"]
     environment:
       - PORT=8000
       - API_URL=http://api:3001

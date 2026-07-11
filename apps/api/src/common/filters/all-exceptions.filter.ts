@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { STATUS_CODES } from 'http';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -23,6 +24,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
+      // Repli sur le libellé HTTP standard (ex. "Unauthorized" pour 401,
+      // "Not Found" pour 404) plutôt que de toujours annoncer une erreur
+      // serveur 500 quand l'exception ne fournit pas son propre champ `error`.
+      error = STATUS_CODES[status] ?? error;
       const res = exception.getResponse();
       if (typeof res === 'string') {
         message = res;

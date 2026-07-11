@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -21,6 +22,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { attachmentUploadOptions } from '../common/multer/upload.options';
 
 @ApiTags('cases')
 @ApiBearerAuth()
@@ -61,12 +63,13 @@ export class CasesController {
 
   @Post(':id/attachments')
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', attachmentUploadOptions()))
   addAttachment(
     @Param('id') id: string,
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: { userId: string },
   ) {
+    if (!file) throw new BadRequestException('Fichier requis.');
     return this.casesService.addAttachment(id, file.buffer, file.mimetype, user.userId);
   }
 }

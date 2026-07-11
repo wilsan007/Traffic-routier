@@ -1,6 +1,9 @@
+import hmac
+import os
+
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from pydantic import BaseModel
 from typing import Optional
 
@@ -13,6 +16,24 @@ app = FastAPI(
     description="Service de détection et de lecture de plaques d'immatriculation (ALPR).",
     version="0.2.0",
 )
+
+# Ce service n'est censé être joignable que depuis le réseau interne Docker
+# (appelé par l'API NestJS et par son propre worker de flux). Il n'a
+# historiquement aucune authentification : si le port 8000 est jamais exposé
+# par erreur (mauvaise configuration réseau/orchestrateur), n'importe qui
+# pourrait lancer des flux vidéo arbitraires (cv2.VideoCapture sur une URL
+# fournie par l'appelant → risque de type SSRF / épuisement de ressources) ou
+# consommer le pipeline de détection gratuitement. On exige donc la même clé
+# de service (x-api-key) que celle utilisée côté API pour les endpoints
+# sensibles, en défense en profondeur.
+SERVICE_API_KEY = os.environ.get("SERVICE_API_KEY", "dev-service-key")
+MAX_IMAGE_SIZE_BYTES = int(os.environ.get("MAX_IMAGE_SIZE_BYTES", str(10 * 1024 * 1024)))
+
+
+def verify_api_key(x_api_key: Optional[str] = Header(default=None)):
+    if not x_api_key or not hmac.compare_digest(x_api_key, SERVICE_API_KEY):
+        raise HTTPException(status_code=401, detail="Clé de service invalide")
+    return True
 
 
 class BoundingBoxOut(BaseModel):
@@ -56,25 +77,28 @@ def health():
 
 # --- Traitement continu de flux vidéo (RTSP/HTTP/fichier) ---
 
-@app.post("/streams", response_model=StreamStatus)
+@app.post("/streams", response_model=StreamStatus, dependencies=[Depends(verify_api_key)])
 def start_stream(request: StartStreamRequest):
-    info = stream_manager.start(request.url, request.camera_id)
+    try:
+        info = stream_manager.start(request.url, request.camera_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc))
     return StreamStatus(**info.__dict__)
 
 
-@app.get("/streams", response_model=list[StreamStatus])
+@app.get("/streams", response_model=list[StreamStatus], dependencies=[Depends(verify_api_key)])
 def list_streams():
     return [StreamStatus(**i.__dict__) for i in stream_manager.list()]
 
 
-@app.delete("/streams/{stream_id}")
+@app.delete("/streams/{stream_id}", dependencies=[Depends(verify_api_key)])
 def stop_stream(stream_id: str):
     if not stream_manager.stop(stream_id):
         raise HTTPException(status_code=404, detail="Flux introuvable")
     return {"stopped": stream_id}
 
 
-@app.post("/detect", response_model=DetectionResponse)
+@app.post("/detect", response_model=DetectionResponse, dependencies=[Depends(verify_api_key)])
 async def detect(image: UploadFile = File(...)):
     if not image.content_type or not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Le fichier fourni doit être une image.")
@@ -82,6 +106,8 @@ async def detect(image: UploadFile = File(...)):
     contents = await image.read()
     if not contents:
         raise HTTPException(status_code=400, detail="Image vide.")
+    if len(contents) > MAX_IMAGE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail="Image trop volumineuse.")
 
     np_array = np.frombuffer(contents, dtype=np.uint8)
     image_bgr = cv2.imdecode(np_array, cv2.IMREAD_COLOR)

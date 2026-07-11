@@ -8,6 +8,8 @@ import { HotlistService } from '../hotlist/hotlist.service';
 import { AlertsService } from '../alerts/alerts.service';
 import { AuditService } from '../common/audit/audit.service';
 import { RedisCacheService } from '../redis/redis-cache.service';
+import { PatternsService } from '../patterns/patterns.service';
+import { TollsService } from '../tolls/tolls.service';
 
 describe('CapturesService', () => {
   let service: CapturesService;
@@ -18,11 +20,18 @@ describe('CapturesService', () => {
   let alertsService: { createFromMatch: jest.Mock };
   let audit: { log: jest.Mock };
   let cache: { get: jest.Mock; set: jest.Mock; del: jest.Mock; delPattern: jest.Mock };
+  let patternsService: {
+    checkClonedPlate: jest.Mock;
+    checkRepeatedPassage: jest.Mock;
+    checkSpeedViolation: jest.Mock;
+  };
+  let tollsService: { processCapture: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
       vehicle: { findUnique: jest.fn() },
       capture: { create: jest.fn(), findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      camera: { update: jest.fn().mockResolvedValue(undefined) },
     };
     storage = { uploadCaptureImage: jest.fn().mockResolvedValue('http://minio/captures/1.jpg') };
     mlClient = { detectPlate: jest.fn() };
@@ -30,6 +39,12 @@ describe('CapturesService', () => {
     alertsService = { createFromMatch: jest.fn() };
     audit = { log: jest.fn().mockResolvedValue(undefined) };
     cache = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(undefined), del: jest.fn().mockResolvedValue(undefined), delPattern: jest.fn().mockResolvedValue(undefined) };
+    patternsService = {
+      checkClonedPlate: jest.fn().mockResolvedValue(null),
+      checkRepeatedPassage: jest.fn().mockResolvedValue(null),
+      checkSpeedViolation: jest.fn().mockResolvedValue(null),
+    };
+    tollsService = { processCapture: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -41,6 +56,8 @@ describe('CapturesService', () => {
         { provide: AlertsService, useValue: alertsService },
         { provide: AuditService, useValue: audit },
         { provide: RedisCacheService, useValue: cache },
+        { provide: PatternsService, useValue: patternsService },
+        { provide: TollsService, useValue: tollsService },
       ],
     }).compile();
 

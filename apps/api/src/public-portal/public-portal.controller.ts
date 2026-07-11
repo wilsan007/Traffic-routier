@@ -9,6 +9,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ApiTags } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
@@ -48,6 +49,15 @@ class PublicDisputeDto {
 // Portail citoyen : accès public SANS authentification, sécurisé par le couple
 // référence du PV + plaque d'immatriculation (comme les portails officiels).
 // Ne renvoie que les données strictement nécessaires au titulaire.
+//
+// NOTE SÉCURITÉ : la référence (PV-AAAA-NNNNNN) est générée de façon
+// séquentielle (voir InfractionsService.nextReference) et la plaque n'est pas
+// un secret (visible sur le véhicule). Le couple référence+plaque est donc
+// énumérable. Le throttling ci-dessous ralentit une énumération automatisée
+// mais ne l'empêche pas structurellement — une correction complète (rendre la
+// référence non séquentielle, ex. suffixe aléatoire) est un choix produit
+// (impacte le format du PV déjà imprimé/notifié) et n'a pas été fait ici.
+@Throttle({ medium: { limit: 8, ttl: 10000 }, long: { limit: 20, ttl: 60000 } })
 @ApiTags('public')
 @Controller('public/infractions')
 export class PublicPortalController {

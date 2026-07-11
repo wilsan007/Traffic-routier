@@ -7,7 +7,8 @@ let opsSocket: Socket | null = null;
 
 export async function getOpsSocket(): Promise<Socket> {
   if (!opsSocket) {
-    const wsUrl = (Constants.expoConfig?.extra?.wsUrl as string) ?? 'ws://localhost:3001';
+    const wsUrl =
+      process.env.EXPO_PUBLIC_WS_URL ?? (Constants.expoConfig?.extra?.wsUrl as string) ?? 'ws://localhost:3001';
     const token = await getToken();
     opsSocket = io(`${wsUrl}/ops`, {
       auth: { token },

@@ -123,7 +123,7 @@ export class InfractionsService {
       include: {
         vehicle: { include: { ownerships: { where: { endDate: null }, include: { owner: true } } } },
         owner: true,
-        officer: true,
+        officer: { select: { id: true, email: true, firstName: true, lastName: true, badgeNumber: true, role: true } },
         capture: true,
         infractionType: true,
         validatedBy: { select: { firstName: true, lastName: true } },

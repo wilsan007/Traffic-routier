@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -19,6 +20,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { imageUploadOptions } from '../common/multer/upload.options';
 
 @ApiTags('captures')
 @ApiBearerAuth()
@@ -29,7 +31,7 @@ export class CapturesController {
 
   @Post()
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions()))
   ingest(
     @UploadedFile() image: Express.Multer.File,
     @Body('cameraId') cameraId: string,
@@ -37,6 +39,7 @@ export class CapturesController {
     @Body('longitude') longitude: string,
     @CurrentUser() user: { userId: string },
   ) {
+    if (!image) throw new BadRequestException('Image requise.');
     return this.capturesService.ingest({
       imageBuffer: image.buffer,
       cameraId: cameraId || undefined,

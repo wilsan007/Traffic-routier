@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Post,
@@ -10,6 +11,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { CapturesService } from './captures.service';
 import { ApiKeyGuard } from '../common/guards/api-key.guard';
+import { imageUploadOptions } from '../common/multer/upload.options';
 
 // Ingestion machine-à-machine depuis le worker de flux vidéo (service ML).
 // Authentifiée par clé de service (x-api-key), pas par JWT utilisateur —
@@ -23,7 +25,7 @@ export class StreamIngestController {
 
   @Post()
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions()))
   ingestFromStream(
     @UploadedFile() image: Express.Multer.File,
     @Body('cameraId') cameraId: string,
@@ -32,6 +34,7 @@ export class StreamIngestController {
     @Body('latitude') latitude: string,
     @Body('longitude') longitude: string,
   ) {
+    if (!image) throw new BadRequestException('Image requise.');
     return this.capturesService.ingest({
       imageBuffer: image.buffer,
       cameraId: cameraId || undefined,

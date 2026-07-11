@@ -84,6 +84,15 @@ export default function PortailPage() {
     }
     setReceipt(body);
     setShowPay(false);
+    setPv((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'PAID',
+            payments: [{ amount: body.amount, receiptNumber: body.receiptNumber, createdAt: body.paidAt }, ...prev.payments],
+          }
+        : prev,
+    );
   }
 
   async function dispute(e: React.FormEvent) {
@@ -106,6 +115,9 @@ export default function PortailPage() {
     }
     setDisputeSent(true);
     setShowDispute(false);
+    setPv((prev) =>
+      prev ? { ...prev, status: 'CONTESTED', dispute: { status: body.status } } : prev,
+    );
   }
 
   return (

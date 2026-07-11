@@ -81,12 +81,12 @@ export default function PatternsPage() {
         </p>
       </div>
 
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-200">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`whitespace-nowrap px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? 'border-blue-600 text-blue-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
@@ -113,7 +113,7 @@ export default function PatternsPage() {
           )}
           {passages.map((p) => (
             <div key={p.id} className="card space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <span className="text-lg font-semibold">{p.plateNumber}</span>
                   <span className="ml-3 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
@@ -197,7 +197,7 @@ export default function PatternsPage() {
           )}
           {suspicious.map((s, i) => (
             <div key={i} className="card space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-lg font-semibold">{s.plateNumber}</span>
                 <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
                   {s.zoneCount} zones
@@ -244,7 +244,8 @@ export default function PatternsPage() {
                       <td>
                         <button
                           onClick={async () => {
-                            await api.post(`/patterns/zones`, {}); // not used — delete below
+                            await api.delete(`/patterns/zones/${z.id}`);
+                            refresh();
                           }}
                           className="text-xs text-red-600 underline"
                         >
@@ -284,7 +285,7 @@ function ZoneForm({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card grid gap-3 md:grid-cols-5">
+    <form onSubmit={handleSubmit} className="card grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
       <input className="input" placeholder="Nom de la zone" value={name} onChange={(e) => setName(e.target.value)} required />
       <input className="input" placeholder="Latitude" type="number" step="0.0001" value={lat} onChange={(e) => setLat(e.target.value)} required />
       <input className="input" placeholder="Longitude" type="number" step="0.0001" value={lng} onChange={(e) => setLng(e.target.value)} required />

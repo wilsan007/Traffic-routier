@@ -35,7 +35,7 @@ jobs:
         run: npm test --passWithNoTests
 
   ml:
-    name: ML - Lint & Build
+    name: ML - Lint, Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,13 +47,19 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Check syntax
-        run: python -m py_compile main.py plate_detector.py
+        run: python -m py_compile main.py plate_detector.py dl_detector.py stream_worker.py
+
+      - name: Test
+        run: python -m pytest -v
 
   web:
     name: Web - Build

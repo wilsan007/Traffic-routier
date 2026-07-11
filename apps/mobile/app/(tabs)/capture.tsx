@@ -40,8 +40,12 @@ export default function CaptureScreen() {
       setTypes(null);
       return;
     }
-    const list = await api.get<InfractionTypeOption[]>('/infraction-types?activeOnly=true');
-    setTypes(list);
+    try {
+      const list = await api.get<InfractionTypeOption[]>('/infraction-types?activeOnly=true');
+      setTypes(list);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de charger le barème');
+    }
   }
 
   async function verbalize(typeId: string) {
@@ -79,7 +83,13 @@ export default function CaptureScreen() {
     if (!cameraRef.current) return;
     setError(null);
     setResult(null);
-    const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+    let photo: { uri: string } | undefined;
+    try {
+      photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+    } catch {
+      setError("Échec de la prise de photo — réessayez.");
+      return;
+    }
     if (!photo) return;
     setPhotoUri(photo.uri);
     setLoading(true);
@@ -195,6 +205,11 @@ export default function CaptureScreen() {
   return (
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+      {error && (
+        <View style={styles.cameraErrorBanner}>
+          <Text style={styles.cameraErrorText}>{error}</Text>
+        </View>
+      )}
       <TouchableOpacity style={styles.shutterButton} onPress={takePhotoAndAnalyze}>
         <View style={styles.shutterInner} />
       </TouchableOpacity>
@@ -219,6 +234,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shutterInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#2f5fdb' },
+  cameraErrorBanner: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(220, 38, 38, 0.92)',
+    borderRadius: 10,
+    padding: 12,
+  },
+  cameraErrorText: { color: 'white', textAlign: 'center', fontWeight: '600' },
   preview: { width: '100%', height: 220, borderRadius: 12, marginBottom: 16, backgroundColor: '#e2e8f0' },
   hint: { marginTop: 8, color: '#64748b' },
   error: { color: '#dc2626', marginBottom: 12 },

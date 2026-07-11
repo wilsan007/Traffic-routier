@@ -6,6 +6,8 @@ build/
 *.log
 .env
 .env.*.local
+.env.backup*
+*.env.orig
 .DS_Store
 coverage/
 __pycache__/

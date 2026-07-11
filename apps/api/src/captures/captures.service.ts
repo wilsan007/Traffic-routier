@@ -8,6 +8,17 @@ import { AuditService } from '../common/audit/audit.service';
 import { PatternsService } from '../patterns/patterns.service';
 import { TollsService } from '../tolls/tolls.service';
 
+// Champs sûrs à exposer pour un utilisateur relié (agent, valideur, etc.) —
+// exclut notamment passwordHash, qui ne doit jamais transiter par l'API.
+const OFFICER_SAFE_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  badgeNumber: true,
+  role: true,
+} as const;
+
 export interface IngestCaptureParams {
   imageBuffer: Buffer;
   cameraId?: string;
@@ -72,7 +83,11 @@ export class CapturesService {
         latitude: params.latitude,
         longitude: params.longitude,
       },
-      include: { vehicle: true, camera: true, officer: true },
+      include: {
+        vehicle: true,
+        camera: true,
+        officer: { select: OFFICER_SAFE_SELECT },
+      },
     });
 
     // La hotlist est aussi comparée sur la plaque du véhicule identifié en
@@ -155,7 +170,12 @@ export class CapturesService {
   async findOne(id: string) {
     const capture = await this.prisma.capture.findUnique({
       where: { id },
-      include: { vehicle: true, camera: true, officer: true, alerts: true },
+      include: {
+        vehicle: true,
+        camera: true,
+        officer: { select: OFFICER_SAFE_SELECT },
+        alerts: true,
+      },
     });
     if (!capture) throw new NotFoundException('Capture introuvable');
     return capture;

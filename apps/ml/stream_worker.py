@@ -24,6 +24,10 @@ SERVICE_API_KEY = os.environ.get("SERVICE_API_KEY", "dev-service-key")
 SAMPLE_INTERVAL = float(os.environ.get("STREAM_SAMPLE_INTERVAL", "2.0"))
 PLATE_COOLDOWN = float(os.environ.get("STREAM_PLATE_COOLDOWN", "60.0"))
 MIN_CONFIDENCE = float(os.environ.get("STREAM_MIN_CONFIDENCE", "0.5"))
+# Nombre max de flux traités en parallèle : empêche qu'un appelant (légitime
+# ou non, cf. authentification sur /streams) n'épuise les ressources
+# (threads, décodage vidéo) en démarrant un nombre illimité de flux.
+MAX_CONCURRENT_STREAMS = int(os.environ.get("STREAM_MAX_CONCURRENT", "20"))
 
 
 @dataclass
@@ -48,13 +52,9 @@ class StreamWorker(threading.Thread):
     def stop(self):
         self.info.running = False
 
-    def _should_send(self, plate: str) -> bool:
+    def _on_cooldown(self, plate: str) -> bool:
         last = self._recent_plates.get(plate)
-        now = time.time()
-        if last is not None and now - last < PLATE_COOLDOWN:
-            return False
-        self._recent_plates[plate] = now
-        return True
+        return last is not None and time.time() - last < PLATE_COOLDOWN
 
     def _send_capture(self, frame, plate: str, confidence: float):
         ok, jpeg = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
@@ -72,6 +72,11 @@ class StreamWorker(threading.Thread):
                 timeout=15,
             )
             response.raise_for_status()
+            # Le cooldown n'est démarré qu'après un envoi réussi : sinon un
+            # échec transitoire (timeout, 5xx, coupure réseau) ferait taire
+            # le flux pour toute la durée du cooldown sans qu'aucune capture
+            # n'ait été réellement enregistrée côté API.
+            self._recent_plates[plate] = time.time()
             self.info.plates_sent += 1
             self.info.last_plate = plate
             logger.info("Flux %s : plaque %s (%.0f%%) envoyée", self.info.id, plate, confidence * 100)
@@ -114,7 +119,7 @@ class StreamWorker(threading.Thread):
                     result
                     and result.plate_text
                     and result.confidence >= MIN_CONFIDENCE
-                    and self._should_send(result.plate_text)
+                    and not self._on_cooldown(result.plate_text)
                 ):
                     self._send_capture(frame, result.plate_text, result.confidence)
 
@@ -130,6 +135,11 @@ class StreamManager:
         self._lock = threading.Lock()
 
     def start(self, url: str, camera_id: str | None) -> StreamInfo:
+        with self._lock:
+            if len(self._workers) >= MAX_CONCURRENT_STREAMS:
+                raise ValueError(
+                    f"Nombre maximum de flux simultanés atteint ({MAX_CONCURRENT_STREAMS})"
+                )
         stream_id = uuid.uuid4().hex[:8]
         info = StreamInfo(id=stream_id, url=url, camera_id=camera_id)
         worker = StreamWorker(info)

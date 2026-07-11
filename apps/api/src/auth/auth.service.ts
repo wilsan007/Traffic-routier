@@ -2,8 +2,20 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../common/audit/audit.service';
+
+// Hash factice (calculé une seule fois) utilisé pour égaliser le temps de
+// réponse lorsqu'aucun compte ne correspond, afin de ne pas révéler par
+// mesure de temps (timing attack) si un e-mail existe en base.
+let dummyHashPromise: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  if (!dummyHashPromise) {
+    dummyHashPromise = argon2.hash(randomBytes(16).toString('hex'));
+  }
+  return dummyHashPromise;
+}
 
 @Injectable()
 export class AuthService {
@@ -17,6 +29,11 @@ export class AuthService {
   async login(email: string, password: string, ipAddress?: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user || !user.active) {
+      // Vérifie quand même contre un hash factice : évite qu'un attaquant
+      // puisse énumérer les comptes existants en mesurant le temps de
+      // réponse (argon2.verify est volontairement coûteux en temps).
+      const dummyHash = await getDummyHash();
+      await argon2.verify(dummyHash, password).catch(() => undefined);
       throw new UnauthorizedException('Identifiants invalides');
     }
 

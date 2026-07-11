@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { IsBoolean, IsNumber, IsOptional, IsString } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
@@ -111,7 +122,18 @@ export class OpsController {
   }
 
   @Patch('messages/:id/read')
-  markRead(@Param('id') id: string) {
+  async markRead(@Param('id') id: string, @CurrentUser() user: { userId: string }) {
+    // N'autorise que le destinataire (ou l'expéditeur, pour un accusé sur le
+    // canal général) à marquer le message comme lu — évite qu'un utilisateur
+    // quelconque altère l'état de lecture d'une conversation qui ne le
+    // concerne pas en devinant/énumérant des identifiants de message.
+    const message = await this.prisma.message.findUnique({ where: { id } });
+    if (!message) throw new NotFoundException('Message introuvable');
+    const isRecipient = message.toId === user.userId || message.toId === null;
+    const isSender = message.fromId === user.userId;
+    if (!isRecipient && !isSender) {
+      throw new ForbiddenException("Vous n'êtes pas destinataire de ce message");
+    }
     return this.prisma.message.update({ where: { id }, data: { readAt: new Date() } });
   }
 

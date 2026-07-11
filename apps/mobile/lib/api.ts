@@ -1,7 +1,12 @@
 import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = (Constants.expoConfig?.extra?.apiUrl as string) ?? 'http://localhost:3001';
+// `localhost` only resolves on a simulator/emulator sharing the dev machine's
+// network stack — on a physical device it points back at the phone itself.
+// Set EXPO_PUBLIC_API_URL (e.g. http://192.168.1.42:3001) to reach the API
+// over the LAN when testing on real hardware.
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL ?? (Constants.expoConfig?.extra?.apiUrl as string) ?? 'http://localhost:3001';
 const TOKEN_KEY = 'tg_token';
 const REFRESH_TOKEN_KEY = 'tg_refresh';
 

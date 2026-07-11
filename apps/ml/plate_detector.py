@@ -148,6 +148,9 @@ def _score_candidate(text: str, confidence: float) -> float:
 
 
 def detect_plate(image_bytes: bytes) -> DetectionResult:
+    if not image_bytes:
+        return DetectionResult(plate_text="", confidence=0.0, bounding_box=None)
+
     np_array = np.frombuffer(image_bytes, dtype=np.uint8)
     image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
     if image is None:
