@@ -106,12 +106,12 @@ export default function InfractionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="page-title">Infractions</h2>
           <p className="page-subtitle">Cycle de vie complet : verbalisation → validation → notification → paiement/contestation → clôture.</p>
         </div>
-        <button className="btn-primary" onClick={() => setShowForm((v) => !v)}>
+        <button className="btn-primary shrink-0" onClick={() => setShowForm((v) => !v)}>
           {showForm ? 'Fermer' : '+ Nouveau PV'}
         </button>
       </div>
@@ -119,14 +119,14 @@ export default function InfractionsPage() {
       {showForm && (
         <form onSubmit={createInfraction} className="card animate-in space-y-4">
           <h3 className="font-semibold">Verbaliser un véhicule</h3>
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <input
               className="input"
               placeholder="Plaque du véhicule (ex: AB123CD)"
               value={plateQuery}
               onChange={(e) => setPlateQuery(e.target.value.toUpperCase())}
             />
-            <button type="button" className="btn-secondary" onClick={searchVehicle}>
+            <button type="button" className="btn-secondary shrink-0" onClick={searchVehicle}>
               Vérifier
             </button>
           </div>
@@ -159,7 +159,7 @@ export default function InfractionsPage() {
         </form>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => (
           <button
             key={f.value}

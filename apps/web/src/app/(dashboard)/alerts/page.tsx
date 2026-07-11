@@ -77,8 +77,8 @@ export default function AlertsPage() {
             </div>
           )}
           {alerts.map((alert) => (
-            <div key={alert.id} className="card animate-in flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-4">
+            <div key={alert.id} className="card animate-in flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3 sm:gap-4">
                 <span className="shrink-0 rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 font-mono text-[15px] font-bold tracking-wider text-slate-900">
                   {alert.capture.plateNumberNormalized}
                 </span>
@@ -89,7 +89,7 @@ export default function AlertsPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2.5">
+              <div className="flex shrink-0 flex-wrap items-center gap-2.5">
                 <PriorityBadge priority={alert.hotlistEntry.priority} />
                 <span className={`badge ${STATUS_STYLES[alert.status] ?? STATUS_STYLES.NEW}`}>
                   {STATUS_LABELS[alert.status] ?? alert.status}

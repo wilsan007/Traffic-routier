@@ -49,7 +49,7 @@ export default function HotlistPage() {
         <p className="page-subtitle">Véhicules volés, personnes recherchées, avis de recherche (BOLO)…</p>
       </div>
 
-      <form onSubmit={handleCreate} className="card grid gap-3 md:grid-cols-5">
+      <form onSubmit={handleCreate} className="card grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-5">
         <input className="input" placeholder="Plaque" value={plateNumber} onChange={(e) => setPlateNumber(e.target.value)} required />
         <select className="input" value={reason} onChange={(e) => setReason(e.target.value as HotlistReason)}>
           <option value="STOLEN_VEHICLE">Véhicule volé</option>
@@ -66,7 +66,7 @@ export default function HotlistPage() {
           <option value="CRITICAL">Critique</option>
         </select>
         <input className="input md:col-span-1" placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-        <button className="btn-primary">Ajouter à la liste</button>
+        <button className="btn-primary sm:col-span-2 md:col-span-1">Ajouter à la liste</button>
       </form>
 
       <div className="card overflow-x-auto">

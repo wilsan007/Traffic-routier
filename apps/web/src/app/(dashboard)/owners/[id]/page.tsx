@@ -43,7 +43,7 @@ export default function OwnerDetailPage({ params }: { params: Promise<{ id: stri
         <span className={`badge ${LICENSE_COLORS[owner.licenseStatus]}`}>Permis : {owner.licenseStatus}</span>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <div className="card">
           <h3 className="mb-2 font-semibold">Informations</h3>
           <dl className="space-y-1 text-sm">

@@ -27,7 +27,7 @@ export interface IngestCaptureParams {
   longitude?: number;
   // Détection déjà effectuée en amont (worker de flux vidéo) — évite un
   // second appel au service ML.
-  preDetected?: { plateText: string; confidence: number };
+  preDetected?: { plateText: string; confidence: number; boundingBox?: { x: number; y: number; width: number; height: number } };
 }
 
 @Injectable()
@@ -54,6 +54,55 @@ export class CapturesService {
       LIMIT 2`;
     if (rows.length !== 1) return null;
     return this.prisma.vehicle.findUnique({ where: { id: rows[0].id } });
+  }
+
+  // Scan éphémère : OCR + vérification hotlist SANS stockage.
+  // Retourne plaque + véhicule + alertes. Si une correspondance hotlist
+  // est trouvée, persiste la capture + crée l'alerte via ingest().
+  async scan(params: IngestCaptureParams) {
+    const detection =
+      params.preDetected ?? (await this.mlClient.detectPlate(params.imageBuffer));
+    const normalized = detection.plateText.toUpperCase().replace(/\s+/g, '');
+
+    let vehicle = normalized
+      ? await this.prisma.vehicle.findUnique({ where: { plateNumber: normalized } })
+      : null;
+    if (!vehicle && normalized) {
+      vehicle = await this.fuzzyFindVehicle(normalized);
+    }
+
+    const platesToCheck = new Set<string>();
+    if (normalized) platesToCheck.add(normalized);
+    if (vehicle) platesToCheck.add(vehicle.plateNumber);
+    const hotlistMatches = (
+      await Promise.all([...platesToCheck].map((p) => this.hotlistService.matchPlate(p)))
+    ).flat();
+    const uniqueMatches = [...new Map(hotlistMatches.map((m) => [m.id, m])).values()];
+
+    // Pas de correspondance hotlist → retour éphémère, zéro stockage
+    if (uniqueMatches.length === 0) {
+      return {
+        capture: null,
+        plateNumberNormalized: normalized,
+        confidence: detection.confidence,
+        boundingBox: detection.boundingBox,
+        vehicleMatch: vehicle,
+        hotlistAlerts: [],
+        persisted: false,
+      };
+    }
+
+    // Correspondance hotlist → on persiste cette capture (preuve + alerte)
+    const persisted = await this.ingest(params);
+    return {
+      capture: persisted.capture,
+      plateNumberNormalized: normalized,
+      confidence: detection.confidence,
+      boundingBox: detection.boundingBox,
+      vehicleMatch: persisted.vehicleMatch,
+      hotlistAlerts: persisted.hotlistAlerts,
+      persisted: true,
+    };
   }
 
   async ingest(params: IngestCaptureParams) {

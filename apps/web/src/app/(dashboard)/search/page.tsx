@@ -68,7 +68,7 @@ export default function SearchPage() {
             </button>
           ))}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
             <IconSearch className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
@@ -79,7 +79,7 @@ export default function SearchPage() {
               autoFocus
             />
           </div>
-          <button className="btn-primary px-6" disabled={loading}>
+          <button className="btn-primary shrink-0 px-6" disabled={loading}>
             {loading ? 'Recherche…' : 'Rechercher'}
           </button>
         </div>

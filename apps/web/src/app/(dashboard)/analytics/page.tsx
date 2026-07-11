@@ -22,7 +22,7 @@ export default function AnalyticsPage() {
         <p className="page-subtitle">Analyse des infractions et du volume de captures ALPR.</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <div className="card">
           <h3 className="mb-4 font-semibold">Infractions par type</h3>
           <ResponsiveContainer width="100%" height={260}>

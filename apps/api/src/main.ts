@@ -65,12 +65,11 @@ async function bootstrap() {
 
   app.useLogger(app.get(PinoLogger));
 
-  const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:4000,http://localhost:4001,http://localhost:4002')
-    .split(',')
-    .map((o) => o.trim());
+  const corsOrigins = process.env.CORS_ORIGINS ?? 'http://localhost:3000,http://localhost:4000,http://localhost:4001,http://localhost:4002';
+  const allowedOrigins = corsOrigins.split(',').map((o) => o.trim());
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: corsOrigins === '*' ? true : allowedOrigins,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
     credentials: true,
   });

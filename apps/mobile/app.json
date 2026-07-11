@@ -45,6 +45,7 @@
     "extra": {
       "apiUrl": "http://localhost:3001",
       "wsUrl": "ws://localhost:3001",
+      "plateRecognizerKey": "3bc56211946ce7bf602a038f90b86a5d9116cd92",
       "router": {},
       "eas": {
         "projectId": "34610b35-c7c4-4ed1-a013-5aa0ddb6f2a2"

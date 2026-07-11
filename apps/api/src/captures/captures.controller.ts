@@ -49,6 +49,24 @@ export class CapturesController {
     });
   }
 
+  @Post('scan')
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('image', imageUploadOptions()))
+  scan(
+    @UploadedFile() image: Express.Multer.File,
+    @Body('latitude') latitude: string,
+    @Body('longitude') longitude: string,
+    @CurrentUser() user: { userId: string },
+  ) {
+    if (!image) throw new BadRequestException('Image requise.');
+    return this.capturesService.scan({
+      imageBuffer: image.buffer,
+      officerId: user.userId,
+      latitude: latitude ? parseFloat(latitude) : undefined,
+      longitude: longitude ? parseFloat(longitude) : undefined,
+    });
+  }
+
   @Get()
   findAll(@Query('plate') plate?: string, @Query('from') from?: string, @Query('to') to?: string) {
     return this.capturesService.findAll({ plate, from, to });

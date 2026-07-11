@@ -66,7 +66,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
         {vehicle.stolen && <span className="badge bg-red-100 text-red-800">SIGNALÉ VOLÉ</span>}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <div className="card">
           <h3 className="mb-2 font-semibold">Informations véhicule</h3>
           <dl className="space-y-1 text-sm">
@@ -109,7 +109,7 @@ export default function VehicleDetailPage({ params }: { params: Promise<{ id: st
 
       <div className="card">
         <h3 className="mb-3 font-semibold">Captures récentes</h3>
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {vehicle.captures.map((c) => (
             <div key={c.id} className="rounded-lg border border-slate-200 p-2 text-xs">
               <img src={c.imageUrl} alt="capture" className="mb-1 h-24 w-full rounded object-cover bg-slate-100" />

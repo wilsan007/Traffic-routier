@@ -17,20 +17,26 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Ip() ip: string,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.login(dto.email, dto.password, ip);
 
-    res.cookie('tg_refresh', result.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/auth',
-    });
+    const isMobile = req.headers['x-client-type'] === 'mobile';
+
+    if (!isMobile) {
+      res.cookie('tg_refresh', result.refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: '/auth',
+      });
+    }
 
     return {
       accessToken: result.accessToken,
+      ...(isMobile ? { refreshToken: result.refreshToken } : {}),
       user: result.user,
     };
   }

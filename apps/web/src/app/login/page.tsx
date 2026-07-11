@@ -79,7 +79,7 @@ export default function LoginPage() {
       </div>
 
       {/* Formulaire */}
-      <div className="flex flex-1 items-center justify-center bg-slate-50 p-6">
+      <div className="flex flex-1 items-center justify-center bg-slate-50 p-4 sm:p-6">
         <div className="animate-in w-full max-w-sm">
           <div className="mb-8 lg:hidden">
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700">

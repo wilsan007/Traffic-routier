@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -26,6 +27,7 @@ const NAV_SECTIONS: { label: string; items: { href: string; label: string; icon:
       { href: '/map', label: 'Carte', icon: IconSearch },
       { href: '/search', label: 'Recherche', icon: IconSearch },
       { href: '/alerts', label: 'Alertes', icon: IconAlert },
+      { href: '/capture', label: 'Capture terrain', icon: IconCamera },
       { href: '/cameras', label: 'Caméras', icon: IconCamera },
     ],
   },
@@ -54,21 +56,12 @@ const NAV_SECTIONS: { label: string; items: { href: string; label: string; icon:
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase();
 
-  return (
-    <aside className="sticky top-0 flex h-screen w-64 flex-col border-r border-white/5 bg-brand-900 text-white">
-      <div className="flex items-center gap-3 px-5 py-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg shadow-brand-500/30">
-          <IconShield className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <h1 className="text-[17px] font-bold leading-tight tracking-tight">TrafficGuard</h1>
-          <p className="text-[11px] font-medium uppercase tracking-widest text-brand-100/60">Police · Trafic</p>
-        </div>
-      </div>
-
+  const navContent = (
+    <>
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-4 pt-2">
         {NAV_SECTIONS.map((section) => (
           <div key={section.label}>
@@ -83,6 +76,7 @@ export function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    onClick={() => setMobileOpen(false)}
                     className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13.5px] font-medium transition-all ${
                       active
                         ? 'bg-white/10 text-white shadow-sm'
@@ -127,6 +121,69 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  const brandHeader = (
+    <div className="flex items-center gap-3 px-5 py-6">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 shadow-lg shadow-brand-500/30">
+        <IconShield className="h-5 w-5 text-white" />
+      </div>
+      <div>
+        <h1 className="text-[17px] font-bold leading-tight tracking-tight">TrafficGuard</h1>
+        <p className="text-[11px] font-medium uppercase tracking-widest text-brand-100/60">Police · Trafic</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="flex items-center justify-between bg-brand-900 px-4 py-3 text-white lg:hidden">
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700">
+            <IconShield className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-sm font-bold">TrafficGuard</span>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="rounded-lg p-2 text-brand-100/70 transition-colors hover:bg-white/10 hover:text-white"
+          aria-label="Ouvrir le menu"
+        >
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 flex h-full w-72 flex-col bg-brand-900 text-white animate-in">
+            <div className="flex items-center justify-between">
+              {brandHeader}
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="mr-4 rounded-lg p-2 text-brand-100/50 transition-colors hover:bg-white/10 hover:text-white"
+                aria-label="Fermer le menu"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            {navContent}
+          </aside>
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <aside className="sticky top-0 hidden h-screen w-64 flex-col border-r border-white/5 bg-brand-900 text-white lg:flex">
+        {brandHeader}
+        {navContent}
+      </aside>
+    </>
   );
 }

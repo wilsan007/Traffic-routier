@@ -102,7 +102,7 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
             <h2 className="page-title font-mono">{item.reference ?? item.id.slice(0, 8)}</h2>
@@ -112,7 +112,7 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
           </div>
           <p className="page-subtitle">{item.type} — {new Date(item.occurredAt).toLocaleString('fr-FR')}</p>
         </div>
-        <button className="btn-secondary" onClick={downloadPdf}>
+        <button className="btn-secondary shrink-0" onClick={downloadPdf}>
           📄 Procès-verbal PDF
         </button>
       </div>
@@ -120,8 +120,8 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
       {actionError && <ErrorBanner message={actionError} />}
 
       {/* Chronologie */}
-      <div className="card">
-        <div className="flex items-center justify-between">
+      <div className="card overflow-x-auto">
+        <div className="flex items-center justify-between min-w-[500px]">
           {timeline.map((step, idx) => (
             <div key={step.label} className="flex flex-1 items-center">
               <div className="flex flex-col items-center text-center">
@@ -145,7 +145,7 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
         <div className="card">
           <h3 className="mb-2 font-semibold">Détails</h3>
           <dl className="space-y-1 text-sm">
@@ -191,7 +191,7 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
                 <button className="btn-primary w-full" onClick={() => act(() => api.patch(`/infractions/${item.id}/validate`))}>
                   ✓ Valider le PV
                 </button>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input className="input" placeholder="Motif de rejet" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
                   <button
                     className="btn-danger-ghost shrink-0"
@@ -230,7 +230,7 @@ export default function InfractionDetailPage({ params }: { params: Promise<{ id:
                 <p className="text-sm">{item.dispute.reason}</p>
                 {item.dispute.details && <p className="text-xs text-slate-500">{item.dispute.details}</p>}
                 <textarea className="input" rows={2} placeholder="Décision motivée" value={disputeDecision} onChange={(e) => setDisputeDecision(e.target.value)} />
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     className="btn-primary flex-1"
                     onClick={() => disputeDecision && act(() => api.patch(`/infractions/${item.id}/dispute/decide`, { accept: true, decision: disputeDecision }))}

@@ -64,7 +64,7 @@ export default function FleetsPage() {
         <p className="page-subtitle">Vue consolidée des véhicules et infractions par flotte (taxis, entreprises, administrations).</p>
       </div>
 
-      <form onSubmit={createFleet} className="card flex gap-3">
+      <form onSubmit={createFleet} className="card flex flex-col gap-3 sm:flex-row">
         <input className="input" placeholder="Nom de la flotte" value={name} onChange={(e) => setName(e.target.value)} required />
         <button className="btn-primary shrink-0">Créer la flotte</button>
       </form>
@@ -91,13 +91,13 @@ export default function FleetsPage() {
         <div className="md:col-span-2">
           {selected ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="card"><p className="text-sm text-slate-500">Véhicules</p><p className="text-2xl font-bold">{selected.summary.vehicleCount}</p></div>
                 <div className="card"><p className="text-sm text-slate-500">Infractions</p><p className="text-2xl font-bold">{selected.summary.infractionCount}</p></div>
                 <div className="card"><p className="text-sm text-slate-500">Montant dû</p><p className="text-2xl font-bold text-brand-700">{selected.summary.totalDue.toFixed(2)} €</p></div>
               </div>
 
-              <form onSubmit={addVehicle} className="card flex gap-3">
+              <form onSubmit={addVehicle} className="card flex flex-col gap-3 sm:flex-row">
                 <input className="input" placeholder="Rattacher un véhicule (plaque)" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} />
                 <button className="btn-secondary shrink-0">Rattacher</button>
               </form>

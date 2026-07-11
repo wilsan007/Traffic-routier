@@ -39,7 +39,7 @@ export default function CasesPage() {
         <p className="page-subtitle">Rapports d'incident et suivi des dossiers en cours.</p>
       </div>
 
-      <form onSubmit={handleCreate} className="card flex gap-3">
+      <form onSubmit={handleCreate} className="card flex flex-col gap-3 sm:flex-row">
         <input className="input" placeholder="Titre du dossier" value={title} onChange={(e) => setTitle(e.target.value)} required />
         <input className="input" placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
         <button className="btn-primary">Créer</button>
@@ -47,7 +47,7 @@ export default function CasesPage() {
 
       <div className="grid gap-3">
         {cases.map((c) => (
-          <Link key={c.id} href={`/cases/${c.id}`} className="card flex items-center justify-between hover:border-brand-500">
+          <Link key={c.id} href={`/cases/${c.id}`} className="card flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between hover:border-brand-500">
             <div>
               <p className="font-semibold">{c.title}</p>
               <p className="text-xs text-slate-400">

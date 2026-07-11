@@ -69,17 +69,17 @@ export default function CamerasPage() {
         <div className="card"><EmptyState message="Aucune caméra enregistrée." /></div>
       )}
 
-      <div className="grid gap-5 md:grid-cols-2">
+      <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
         {cameras.map((camera) => (
           <div key={camera.id} className="card animate-in space-y-3">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h3 className="font-semibold">{camera.name}</h3>
                 <p className="text-xs text-slate-400">
                   {camera.type === 'FIXED' ? 'Fixe' : 'Mobile'} · {camera.region.name}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`badge ${camera.online ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${camera.online ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                   {camera.online ? 'En ligne' : 'Hors ligne'}
@@ -131,7 +131,7 @@ export default function CamerasPage() {
             </div>
 
             {editStream?.id === camera.id && (
-              <div className="animate-in flex gap-2">
+              <div className="animate-in flex flex-col gap-2 sm:flex-row">
                 <input
                   className="input font-mono text-xs"
                   placeholder="rtsp://utilisateur:mdp@ip:554/stream"

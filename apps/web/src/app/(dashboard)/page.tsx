@@ -55,12 +55,12 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="page-title">Tableau de bord</h2>
           <p className="page-subtitle">Vue d'ensemble de l'activité en temps réel</p>
         </div>
-        <span className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+        <span className="flex items-center gap-2 self-start rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 sm:self-auto">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
           En direct
         </span>
@@ -81,7 +81,7 @@ export default function OverviewPage() {
           </div>
 
           <div className="card">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between gap-2">
               <h3 className="text-[15px] font-semibold text-slate-900">Alertes en temps réel</h3>
               <Link href="/alerts" className="text-sm font-medium text-brand-500 hover:text-brand-600">
                 Tout voir →
@@ -92,14 +92,14 @@ export default function OverviewPage() {
             ) : (
               <ul className="divide-y divide-slate-100">
                 {liveAlerts.map((alert) => (
-                  <li key={alert.id} className="animate-in flex items-center justify-between py-3.5">
-                    <div className="flex items-center gap-4">
-                      <span className="rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-sm font-bold tracking-wider text-slate-900">
+                  <li key={alert.id} className="animate-in flex flex-col gap-2 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="shrink-0 rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 font-mono text-sm font-bold tracking-wider text-slate-900">
                         {alert.capture.plateNumberNormalized}
                       </span>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">{alert.hotlistEntry.reason}</p>
-                        <p className="text-xs text-slate-400">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-700">{alert.hotlistEntry.reason}</p>
+                        <p className="truncate text-xs text-slate-400">
                           {new Date(alert.createdAt).toLocaleString('fr-FR')}
                         </p>
                       </div>

@@ -18,9 +18,9 @@ export function ProtectedShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex">
+    <div className="flex flex-col lg:flex-row">
       <Sidebar />
-      <main className="min-h-screen flex-1 overflow-y-auto bg-slate-50 p-8">{children}</main>
+      <main className="min-h-screen flex-1 overflow-y-auto bg-slate-50 p-4 sm:p-6 lg:p-8">{children}</main>
     </div>
   );
 }

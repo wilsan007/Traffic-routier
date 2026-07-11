@@ -59,7 +59,7 @@ export default function TollsPage() {
         <p className="page-subtitle">Chaque passage détecté par une caméra de péage génère automatiquement une transaction.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="card"><p className="text-sm text-slate-500">Zones actives</p><p className="text-2xl font-bold">{zones.filter((z) => z.active).length}</p></div>
         <div className="card"><p className="text-sm text-slate-500">Transactions</p><p className="text-2xl font-bold">{transactions.length}</p></div>
         <div className="card"><p className="text-sm text-slate-500">En attente de facturation</p><p className="text-2xl font-bold text-brand-700">{pendingTotal.toFixed(2)} €</p></div>

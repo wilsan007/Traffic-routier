@@ -45,7 +45,7 @@ export default function UsersPage() {
       </div>
 
       {user?.role === 'ADMIN' && (
-        <form onSubmit={handleCreate} className="card grid gap-3 md:grid-cols-6">
+        <form onSubmit={handleCreate} className="card grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-6">
           <input className="input" placeholder="Prénom" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
           <input className="input" placeholder="Nom" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} required />
           <input className="input" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
@@ -56,7 +56,7 @@ export default function UsersPage() {
             <option value="SUPERVISOR">Superviseur</option>
             <option value="ADMIN">Admin</option>
           </select>
-          <button className="btn-primary md:col-span-6">Créer le compte</button>
+          <button className="btn-primary sm:col-span-2 md:col-span-6">Créer le compte</button>
         </form>
       )}
 

@@ -81,6 +81,9 @@ export default function HomeScreen() {
       <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/(tabs)/capture')}>
         <Text style={styles.actionText}>📷 Scanner une plaque</Text>
       </TouchableOpacity>
+      <TouchableOpacity style={styles.actionButtonSecondary} onPress={() => router.push('/demo')}>
+        <Text style={styles.actionTextSecondary}>🧪 Mode démo (reconnaissance standalone)</Text>
+      </TouchableOpacity>
       <TouchableOpacity style={styles.actionButtonSecondary} onPress={() => router.push('/(tabs)/search')}>
         <Text style={styles.actionTextSecondary}>🔍 Recherche rapide</Text>
       </TouchableOpacity>

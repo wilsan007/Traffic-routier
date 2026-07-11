@@ -65,6 +65,7 @@ async function refreshAccessToken(): Promise<string | null> {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken();
   const headers: Record<string, string> = {
+    'X-Client-Type': 'mobile',
     ...(options.body && !(options.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...((options.headers as Record<string, string>) ?? {}),

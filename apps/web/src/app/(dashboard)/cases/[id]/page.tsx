@@ -43,12 +43,12 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="page-title">{item.title}</h2>
           <p className="page-subtitle">{item.description}</p>
         </div>
-        <select className="input w-40" value={item.status} onChange={(e) => updateStatus(e.target.value)}>
+        <select className="input w-full sm:w-40" value={item.status} onChange={(e) => updateStatus(e.target.value)}>
           <option value="OPEN">Ouvert</option>
           <option value="IN_PROGRESS">En cours</option>
           <option value="CLOSED">Clôturé</option>
@@ -68,7 +68,7 @@ export default function CaseDetailPage({ params }: { params: Promise<{ id: strin
           ))}
           {item.notes.length === 0 && <p className="text-slate-400">Aucune note.</p>}
         </ul>
-        <form onSubmit={addNote} className="flex gap-3">
+        <form onSubmit={addNote} className="flex flex-col gap-3 sm:flex-row">
           <input className="input" placeholder="Ajouter une note…" value={note} onChange={(e) => setNote(e.target.value)} />
           <button className="btn-primary">Ajouter</button>
         </form>

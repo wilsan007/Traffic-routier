@@ -53,14 +53,14 @@ export default function BaremePage() {
       </div>
 
       {canEdit && (
-        <form onSubmit={create} className="card grid gap-3 md:grid-cols-7">
+        <form onSubmit={create} className="card grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-7">
           <input className="input" placeholder="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required />
           <input className="input md:col-span-2" placeholder="Libellé" value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} required />
           <input className="input" placeholder="Catégorie" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           <input className="input" type="number" step="0.01" placeholder="Montant €" value={form.baseAmount} onChange={(e) => setForm({ ...form, baseAmount: e.target.value })} required />
           <input className="input" type="number" step="0.01" placeholder="Minoré €" value={form.reducedAmount} onChange={(e) => setForm({ ...form, reducedAmount: e.target.value })} />
           <input className="input" type="number" step="0.01" placeholder="Majoré €" value={form.increasedAmount} onChange={(e) => setForm({ ...form, increasedAmount: e.target.value })} />
-          <button className="btn-primary md:col-span-7">Ajouter au barème</button>
+          <button className="btn-primary sm:col-span-2 md:col-span-7">Ajouter au barème</button>
         </form>
       )}
 

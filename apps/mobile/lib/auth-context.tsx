@@ -27,10 +27,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const res = await api.post<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/login', {
-      email,
-      password,
-    });
+    const res = await Promise.race([
+      api.post<{ accessToken: string; refreshToken: string; user: AuthUser }>('/auth/login', {
+        email,
+        password,
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('ABORT_TIMEOUT')), 5000),
+      ),
+    ]);
     await setToken(res.accessToken);
     await setRefreshToken(res.refreshToken);
     await AsyncStorage.setItem('tg_user', JSON.stringify(res.user));

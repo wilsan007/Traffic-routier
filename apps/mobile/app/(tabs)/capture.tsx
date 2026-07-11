@@ -1,8 +1,10 @@
-import { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView } from 'react-native';
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Switch } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { api, API_URL, getToken } from '../../lib/api';
+import { getAlertsSocket } from '../../lib/socket';
 
 interface InfractionTypeOption {
   id: string;
@@ -12,15 +14,14 @@ interface InfractionTypeOption {
   points: number;
 }
 
-interface CaptureResult {
-  capture: {
-    id: string;
-    plateNumberNormalized: string;
-    confidence: number;
-    imageUrl: string;
-  };
+interface ScanResult {
+  capture: { id: string; plateNumberNormalized: string; confidence: number; imageUrl: string } | null;
+  plateNumberNormalized: string;
+  confidence: number;
+  boundingBox?: { x: number; y: number; width: number; height: number };
   vehicleMatch: { id: string; plateNumber: string; make?: string; model?: string; stolen: boolean } | null;
   hotlistAlerts: { id: string; hotlistEntry: { reason: string; priority: string } }[];
+  persisted: boolean;
 }
 
 export default function CaptureScreen() {
@@ -28,12 +29,130 @@ export default function CaptureScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<CaptureResult | null>(null);
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [livePlate, setLivePlate] = useState<string | null>(null);
+  const [liveConfidence, setLiveConfidence] = useState(0);
   const [error, setError] = useState<string | null>(null);
   // Verbalisation terrain
   const [types, setTypes] = useState<InfractionTypeOption[] | null>(null);
   const [pvCreated, setPvCreated] = useState<string | null>(null);
   const [pvLoading, setPvLoading] = useState(false);
+  // Mode scan continu
+  const [continuous, setContinuous] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [lastAlert, setLastAlert] = useState<string | null>(null);
+  const continuousRef = useRef(false);
+  const scanningRef = useRef(false);
+  // Enregistrement vidéo
+  const [recording, setRecording] = useState(false);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+
+  // Notifications locales pour les alertes en mode continu
+  useEffect(() => {
+    if (!continuous) return;
+    let cleanup: (() => void) | undefined;
+    getAlertsSocket().then((socket) => {
+      const handler = (alert: { capture: { plateNumberNormalized: string }; hotlistEntry: { reason: string; priority: string } }) => {
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `🚨 Alerte ${alert.hotlistEntry.priority}`,
+            body: `${alert.capture.plateNumberNormalized} — ${alert.hotlistEntry.reason}`,
+            sound: 'default',
+          },
+          trigger: null,
+        });
+        setLastAlert(`${alert.capture.plateNumberNormalized} — ${alert.hotlistEntry.reason}`);
+      };
+      socket.on('alert.new', handler);
+      cleanup = () => socket.off('alert.new', handler);
+    });
+    return () => cleanup?.();
+  }, [continuous]);
+
+  // Boucle de scan continu
+  const runContinuousScan = useCallback(async () => {
+    if (!continuousRef.current || scanningRef.current || !cameraRef.current) return;
+    scanningRef.current = true;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.6 });
+      if (!photo) return;
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      let coords: Location.LocationObjectCoords | null = null;
+      if (status === 'granted') {
+        const position = await Location.getCurrentPositionAsync({});
+        coords = position.coords;
+      }
+
+      const form = new FormData();
+      form.append('image', { uri: photo.uri, name: 'capture.jpg', type: 'image/jpeg' } as any);
+      if (coords) {
+        form.append('latitude', String(coords.latitude));
+        form.append('longitude', String(coords.longitude));
+      }
+
+      const token = await getToken();
+      const res = await fetch(`${API_URL}/captures/scan`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'X-Client-Type': 'mobile' },
+        body: form,
+      });
+      if (!res.ok) return;
+      const data: ScanResult = await res.json();
+      setScanCount((c) => c + 1);
+
+      if (data.plateNumberNormalized) {
+        setLivePlate(data.plateNumberNormalized);
+        setLiveConfidence(data.confidence);
+      } else {
+        setLivePlate(null);
+      }
+
+      if (data.hotlistAlerts.length > 0) {
+        setPhotoUri(photo.uri);
+        setResult(data);
+        continuousRef.current = false;
+        setContinuous(false);
+        Notifications.scheduleNotificationAsync({
+          content: {
+            title: `🚨 ${data.plateNumberNormalized} — Liste de surveillance`,
+            body: data.hotlistAlerts.map((a) => a.hotlistEntry.reason).join(', '),
+            sound: 'default',
+          },
+          trigger: null,
+        });
+      }
+    } catch {
+      // erreur ponctuelle, on continue
+    } finally {
+      scanningRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    continuousRef.current = continuous;
+    if (!continuous) return;
+    const interval = setInterval(runContinuousScan, 1000);
+    return () => clearInterval(interval);
+  }, [continuous, runContinuousScan]);
+
+  async function toggleRecording() {
+    if (!cameraRef.current) return;
+    if (recording) {
+      cameraRef.current.stopRecording();
+      setRecording(false);
+    } else {
+      setRecording(true);
+      try {
+        const video = await cameraRef.current.recordAsync({ maxDuration: 60 });
+        if (video) setVideoUri(video.uri);
+      } catch {
+        setError('Erreur enregistrement vidéo');
+      } finally {
+        setRecording(false);
+      }
+    }
+  }
 
   async function openVerbalisation() {
     if (types) {
@@ -49,7 +168,7 @@ export default function CaptureScreen() {
   }
 
   async function verbalize(typeId: string) {
-    if (!result?.vehicleMatch) return;
+    if (!result?.vehicleMatch || !result?.capture) return;
     setPvLoading(true);
     try {
       const pv = await api.post<{ reference: string }>('/infractions', {
@@ -110,13 +229,13 @@ export default function CaptureScreen() {
       }
 
       const token = await getToken();
-      const res = await fetch(`${API_URL}/captures`, {
+      const res = await fetch(`${API_URL}/captures/scan`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, 'X-Client-Type': 'mobile' },
         body: form,
       });
       if (!res.ok) throw new Error("Échec de l'analyse de la plaque");
-      const data: CaptureResult = await res.json();
+      const data: ScanResult = await res.json();
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -131,6 +250,14 @@ export default function CaptureScreen() {
     setError(null);
     setTypes(null);
     setPvCreated(null);
+    setVideoUri(null);
+    setLastAlert(null);
+    setLivePlate(null);
+  }
+
+  function resetContinuous() {
+    setScanCount(0);
+    setLastAlert(null);
   }
 
   if (photoUri) {
@@ -146,9 +273,10 @@ export default function CaptureScreen() {
         {error && <Text style={styles.error}>{error}</Text>}
         {result && (
           <View style={styles.resultCard}>
-            <Text style={styles.plateText}>{result.capture.plateNumberNormalized || 'Aucune plaque détectée'}</Text>
+            <Text style={styles.plateText}>{result.plateNumberNormalized || 'Aucune plaque détectée'}</Text>
             <Text style={styles.confidenceText}>
-              Confiance OCR : {(result.capture.confidence * 100).toFixed(0)}%
+              Confiance OCR : {(result.confidence * 100).toFixed(0)}%
+              {result.persisted ? ' · ⚠️ Capture sauvegardée (alerte)' : ' · Éphémère (non sauvegardée)'}
             </Text>
             {result.vehicleMatch ? (
               <Text style={styles.matchText}>
@@ -171,7 +299,7 @@ export default function CaptureScreen() {
           </View>
         )}
         {/* Verbalisation depuis la capture (PV terrain) */}
-        {result?.vehicleMatch && !pvCreated && (
+        {result?.persisted && result?.capture && result?.vehicleMatch && !pvCreated && (
           <TouchableOpacity style={styles.verbalizeButton} onPress={openVerbalisation} disabled={pvLoading}>
             <Text style={styles.actionText}>{types ? 'Fermer le barème' : '📝 Verbaliser ce véhicule'}</Text>
           </TouchableOpacity>
@@ -202,17 +330,75 @@ export default function CaptureScreen() {
     );
   }
 
+  if (videoUri) {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
+        <Text style={styles.sectionTitle}>Vidéo enregistrée</Text>
+        <View style={styles.videoPlaceholder}>
+          <Text style={styles.hint}>Vidéo sauvegardée :</Text>
+          <Text style={styles.videoPath}>{videoUri}</Text>
+        </View>
+        <TouchableOpacity style={styles.actionButton} onPress={() => setVideoUri(null)}>
+          <Text style={styles.actionText}>Retour à la caméra</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+      <CameraView
+        ref={cameraRef}
+        style={styles.camera}
+        facing="back"
+        mode={recording ? 'video' : 'picture'}
+      />
+      {/* Overlay live — plaque détectée en temps réel */}
+      {livePlate && (
+        <View style={styles.liveOverlay}>
+          <Text style={styles.livePlate}>{livePlate}</Text>
+          <Text style={styles.liveConfidence}>
+            {(liveConfidence * 100).toFixed(0)}% · {continuous ? 'scan live 1 fps' : 'appuyez pour capturer'}
+          </Text>
+        </View>
+      )}
+      {/* Bandeau mode continu */}
+      {continuous && (
+        <View style={styles.continuousBanner}>
+          <Text style={styles.continuousText}>
+            🔍 Scan live — {scanCount} plaque(s) vérifiée(s) · éphémère
+          </Text>
+          {lastAlert && <Text style={styles.continuousAlert}>⚠️ {lastAlert}</Text>}
+        </View>
+      )}
       {error && (
         <View style={styles.cameraErrorBanner}>
           <Text style={styles.cameraErrorText}>{error}</Text>
         </View>
       )}
-      <TouchableOpacity style={styles.shutterButton} onPress={takePhotoAndAnalyze}>
-        <View style={styles.shutterInner} />
-      </TouchableOpacity>
+      {/* Contrôles mode continu + enregistrement */}
+      <View style={styles.controlsRow}>
+        <View style={styles.continuousToggle}>
+          <Text style={styles.toggleLabel}>Scan live 1 fps</Text>
+          <Switch
+            value={continuous}
+            onValueChange={(v) => { setContinuous(v); if (v) resetContinuous(); }}
+            trackColor={{ true: '#2f5fdb' }}
+          />
+        </View>
+        <TouchableOpacity
+          style={[styles.recordButton, recording && styles.recordButtonActive]}
+          onPress={toggleRecording}
+        >
+          <View style={styles.recordInner} />
+        </TouchableOpacity>
+      </View>
+      {/* Bouton capture manuelle */}
+      {!continuous && !recording && (
+        <TouchableOpacity style={styles.shutterButton} onPress={takePhotoAndAnalyze}>
+          <View style={styles.shutterInner} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -273,4 +459,59 @@ const styles = StyleSheet.create({
   pvBox: { backgroundColor: '#ecfdf5', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#a7f3d0' },
   pvTitle: { color: '#047857', fontWeight: '700' },
   pvHint: { color: '#059669', fontSize: 12, marginTop: 2 },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#0f1f4a', marginBottom: 16 },
+  videoPlaceholder: { backgroundColor: 'white', borderRadius: 12, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#e2e8f0' },
+  videoPath: { color: '#64748b', fontSize: 12, marginTop: 4 },
+  liveOverlay: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(15, 31, 74, 0.85)',
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+  },
+  livePlate: { color: 'white', fontSize: 22, fontWeight: 'bold', letterSpacing: 2 },
+  liveConfidence: { color: '#94a3b8', fontSize: 11, marginTop: 4 },
+  continuousBanner: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(47, 95, 219, 0.92)',
+    borderRadius: 10,
+    padding: 10,
+  },
+  continuousText: { color: 'white', fontWeight: '600', textAlign: 'center', fontSize: 13 },
+  continuousAlert: { color: '#fef3c7', fontSize: 12, marginTop: 4, textAlign: 'center' },
+  controlsRow: {
+    position: 'absolute',
+    bottom: 32,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  continuousToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  toggleLabel: { color: '#0f1f4a', fontWeight: '600', fontSize: 14 },
+  recordButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordButtonActive: { backgroundColor: '#dc2626' },
+  recordInner: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#dc2626' },
 });

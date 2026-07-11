@@ -16,7 +16,7 @@ export default function MapPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col space-y-4">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h2 className="page-title">Carte opérationnelle</h2>
           <p className="page-subtitle">
@@ -24,31 +24,33 @@ export default function MapPage() {
           </p>
         </div>
         <form
-          className="flex gap-2"
+          className="flex flex-col gap-2 sm:flex-row"
           onSubmit={(e) => {
             e.preventDefault();
             setTracePlate(plateInput.trim() || undefined);
           }}
         >
           <input
-            className="input w-56 font-mono"
+            className="input w-full font-mono sm:w-56"
             placeholder="Tracer une plaque…"
             value={plateInput}
             onChange={(e) => setPlateInput(e.target.value.toUpperCase())}
           />
-          <button className="btn-primary">Tracer</button>
-          {tracePlate && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => {
-                setTracePlate(undefined);
-                setPlateInput('');
-              }}
-            >
-              Tout afficher
-            </button>
-          )}
+          <div className="flex gap-2">
+            <button className="btn-primary shrink-0">Tracer</button>
+            {tracePlate && (
+              <button
+                type="button"
+                className="btn-secondary shrink-0"
+                onClick={() => {
+                  setTracePlate(undefined);
+                  setPlateInput('');
+                }}
+              >
+                Tout afficher
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -56,7 +58,7 @@ export default function MapPage() {
         <MapView tracePlate={tracePlate} />
       </div>
 
-      <div className="flex gap-5 text-xs text-slate-500">
+      <div className="flex flex-wrap gap-3 text-xs text-slate-500 sm:gap-5">
         <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-brand-500" />Capture</span>
         <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-red-600" />Véhicule volé / trajectoire</span>
         <span><span className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />Agent en service</span>
