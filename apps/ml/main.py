@@ -61,6 +61,8 @@ class StreamStatus(BaseModel):
     camera_id: Optional[str]
     running: bool
     frames_processed: int
+    motion_events: int
+    vehicles_detected: int
     plates_sent: int
     last_plate: Optional[str]
     last_error: Optional[str]

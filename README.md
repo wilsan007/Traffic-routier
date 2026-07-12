@@ -33,7 +33,31 @@ packages/
   shared/   Types TypeScript partagés entre web et mobile
 ```
 
-Flux d'une capture : caméra/mobile → `POST /captures` (NestJS) → upload image (S3/MinIO) → appel au service ML (`/detect`) → normalisation de la plaque → recherche du véhicule en base → correspondance avec la liste de surveillance → création d'alerte + diffusion WebSocket → journal d'audit.
+Flux d'une capture (image unique) : caméra/mobile → `POST /captures` (NestJS) → upload image (S3/MinIO) → appel au service ML (`/detect`) → normalisation de la plaque → recherche du véhicule en base → correspondance avec la liste de surveillance → création d'alerte + diffusion WebSocket → journal d'audit.
+
+### Pipeline flux vidéo temps réel (RTSP/HTTP)
+
+Au-delà de l'upload d'une image ponctuelle, le service ML traite des **flux
+vidéo continus** via un pipeline intelligent à trois étages, plutôt que de
+lancer l'OCR aveuglément sur chaque frame :
+
+1. **Détection de mouvement** (`motion_detector.py`) — soustraction de fond
+   MOG2 : sur une caméra fixe, les frames sans mouvement sont ignorées (route
+   vide → aucun calcul lourd, aucun faux positif).
+2. **Classification véhicule** (`vehicle_detector.py`) — parmi ce qui bouge, on
+   ne garde que ce qui est un véhicule (piéton, vélo, animal écartés) puis on
+   recadre dessus. Heuristique géométrique par défaut (sans dépendance) ;
+   détecteur deep learning optionnel (ultralytics YOLO) si le paquet est
+   installé, avec repli automatique.
+3. **Lecture de plaque** (`dl_detector.py` → `plate_detector.py`) — ALPR sur la
+   région du véhicule, déduplication par plaque (cooldown), puis envoi à l'API
+   (`POST /captures/stream`).
+
+Gestion des flux : `POST /streams` (démarrer), `GET /streams` (état :
+frames analysées, événements de mouvement, véhicules détectés, plaques
+envoyées), `DELETE /streams/{id}` (arrêter). Réglages via variables
+d'environnement (`STREAM_SAMPLE_INTERVAL`, `MOTION_MIN_AREA_RATIO`,
+`VEHICLE_MIN_AREA_RATIO`, `STREAM_PLATE_COOLDOWN`, `STREAM_MIN_CONFIDENCE`…).
 
 ## Stack technique
 
