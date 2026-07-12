@@ -1,74 +1,81 @@
-# Déploiement API sur Railway — Guide complet
+# Déploiement de l'API sur Railway (base de données Supabase)
 
-## Étapes
+L'API est déployée sur Railway ; la base de données et l'authentification
+restent sur **Supabase**. Railway construit l'image via le `Dockerfile` racine
+(détecté par `railway.json`).
 
-### 1. Créer un compte Railway
-- Allez sur https://railway.app
-- Connectez-vous avec GitHub (ou créez un compte)
+## 1. Projet Railway
+- https://railway.app → **New Project → Deploy from GitHub repo**
+- Sélectionner le dépôt `Traffic-routier`.
+- Railway détecte `railway.json` + `Dockerfile` automatiquement.
 
-### 2. Nouveau projet → Deploy from GitHub repo
-- Sélectionnez votre dépôt `gestion traffic routier`
-- Railway détectera automatiquement le `railway.json` et le `Dockerfile`
+## 2. Variables d'environnement (service API → Variables)
 
-### 3. Ajouter PostgreSQL
-- Dans Railway → **New → Database → PostgreSQL**
-- Railway crée automatiquement une variable `DATABASE_URL`
-- Copiez cette URL
-
-### 4. Ajouter Redis (optionnel pour le throttling)
-- **New → Database → Redis**
-- Copiez l'URL `REDIS_URL`
-
-### 5. Configurer les variables d'environnement
-Dans Railway → votre service API → **Variables**, ajoutez :
+> ⚠️ Ne PAS réutiliser d'anciens secrets présents dans l'historique Git.
+> Générer des valeurs fraîches :
+> `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 ```
 NODE_ENV=production
-DATABASE_URL=<auto-rempli par Railway PostgreSQL>
-REDIS_URL=<auto-rempli par Railway Redis>
 
-# Secrets JWT (générés aléatoirement — ne PAS utiliser les valeurs par défaut)
-JWT_SECRET=1035d56ba5886696d5e5033d10f8c63232133651990f0055a36cf09ad13b608a
+# Base de données Supabase — utiliser le "Session pooler" (IPv4), port 5432.
+# (Supabase → Project Settings → Database → Connection string → Session pooler)
+DATABASE_URL=postgresql://postgres.<ref>:<mot-de-passe-encodé>@aws-0-<region>.pooler.supabase.com:5432/postgres
+
+# Auth Supabase (le login vérifie les identifiants contre Supabase Auth)
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_ANON_KEY=<clé publiable/anon Supabase>
+
+# Secrets (OBLIGATOIRES en production — l'API refuse de démarrer sinon)
+JWT_SECRET=<64 hex générés>
+JWT_REFRESH_SECRET=<64 hex générés>
+SERVICE_API_KEY=<48 hex générés>
 JWT_EXPIRES_IN=8h
-JWT_REFRESH_SECRET=0395081670668ed3c6012fdbe7f3f1728e4b50a63bb55cdcea46aba021488c7b
 JWT_REFRESH_EXPIRES_IN=7d
 
-# Clé de service (machine-à-machine)
-SERVICE_API_KEY=b01463aea35c34917ae00bcd00b285dba1c183cccc25d708
+# Redis (optionnel — throttling. Ajouter un plugin Redis Railway si voulu)
+# REDIS_URL=<auto-rempli par le plugin Redis Railway>
 
-# CORS — autoriser l'app mobile (capacitor/expo) + le web
+# CORS — autoriser le front web déployé (et * en démo)
 CORS_ORIGINS=*
 
-# Service ML (laissez localhost si pas déployé — le scan /captures/scan gérera l'absence)
+# Service ML (non déployé en démo — le healthcheck le traite comme optionnel)
 ML_SERVICE_URL=http://localhost:8000
 
-# Stockage images — utiliser le système de fichiers local (pas de S3 en démo)
+# Stockage images (laisser vide en démo = pas de S3)
 S3_ENDPOINT=
-S3_ACCESS_KEY=
-S3_SECRET_KEY=
 S3_BUCKET=trafficguard-captures
 S3_REGION=us-east-1
 ```
 
-### 6. Déployer
-- Railway build et déploie automatiquement
-- L'URL sera du type : `https://votre-api.up.railway.app`
-- Vérifiez : `https://votre-api.up.railway.app/health` → doit retourner un statut OK
-- Swagger : `https://votre-api.up.railway.app/docs`
+## 3. Déploiement
+- Railway build + démarre automatiquement.
+- Démarrage : `prisma migrate deploy` puis (seed non bloquant) puis l'API.
+- Healthcheck : `GET /health` → 200 tant que la **base** répond (Redis/ML sont
+  optionnels et ne bloquent pas le démarrage).
+- URL type : `https://<service>.up.railway.app`
+  - Vérifier `…/health` (doit renvoyer `"status":"ok"`)
+  - Swagger : `…/docs`
 
-### 7. Mettre à jour l'app mobile
-Une fois l'URL Railway obtenue, mettez à jour `apps/mobile/app.json` :
-```json
-"apiUrl": "https://votre-api.up.railway.app"
+## 4. Comptes de connexion
+- **Comptes Supabase Auth** : créés dans Supabase → Authentication (doivent être
+  *confirmés* ; le rôle se règle dans *User Metadata*, ex. `"role":"ADMIN"`).
+- **Comptes de démonstration** (repli, créés par le seed) :
+  - `admin@trafficguard.local` / `Admin123!`
+  - `superviseur@trafficguard.local` / `Supervisor123!`
+  - `agent@trafficguard.local` / `Officer123!`
+
+## 5. Brancher les clients sur l'API déployée
+- **Web** : variable de build `NEXT_PUBLIC_API_URL=https://<service>.up.railway.app`
+  (service web séparé, `apps/web/Dockerfile`).
+- **Mobile** : `apps/mobile/app.json` → `extra.apiUrl` = URL Railway, puis
+  `eas build` (ou `EXPO_PUBLIC_API_URL` en dev).
+
+## 6. Déploiement via CLI (alternative au GitHub)
 ```
-
-### 8. Rebuilder l'APK
-```bash
-cd apps/mobile
-eas build --platform android --profile preview --non-interactive
+npm i -g @railway/cli
+railway login
+railway link          # sélectionner le projet
+railway up            # build + deploy depuis le code local
+railway variables     # vérifier/ajuster les variables ci-dessus
 ```
-
-### 9. Compte de test
-L'API seed crée un compte agent :
-- Email : `agent@trafficguard.local`
-- Mot de passe : `Officer123!`
