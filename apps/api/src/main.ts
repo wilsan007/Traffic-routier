@@ -107,8 +107,12 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document);
 
-  const port = process.env.API_PORT ?? 3001;
-  await app.listen(port);
+  // Les hébergeurs cloud (Render, Railway, Fly, Heroku…) imposent le port
+  // d'écoute via la variable PORT. On la respecte en priorité, puis API_PORT
+  // (dev local), puis 3001. On écoute sur 0.0.0.0 pour être joignable en
+  // conteneur.
+  const port = process.env.PORT ?? process.env.API_PORT ?? 3001;
+  await app.listen(port, '0.0.0.0');
   new Logger('Bootstrap').log(`TrafficGuard API listening on port ${port}`);
 }
 bootstrap().catch((err) => {

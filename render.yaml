@@ -1,0 +1,38 @@
+# Blueprint Render — API TrafficGuard (Docker, offre gratuite, sans carte).
+# Base de données + auth : Supabase (variables ci-dessous).
+# Déploiement : Render → New + → Blueprint → sélectionner ce dépôt.
+services:
+  - type: web
+    name: trafficguard-api
+    runtime: docker
+    repo: https://github.com/wilsan007/Traffic-routier
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: ML_SERVICE_URL
+        value: http://localhost:8000
+      # Secrets & connexions — à saisir dans le dashboard Render (non versionnés)
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: SERVICE_API_KEY
+        sync: false
