@@ -43,8 +43,8 @@
       ]
     ],
     "extra": {
-      "apiUrl": "http://localhost:3001",
-      "wsUrl": "ws://localhost:3001",
+      "apiUrl": "https://trafficguard-api-ftqe.onrender.com",
+      "wsUrl": "wss://trafficguard-api-ftqe.onrender.com",
       "plateRecognizerKey": "3bc56211946ce7bf602a038f90b86a5d9116cd92",
       "router": {},
       "eas": {
