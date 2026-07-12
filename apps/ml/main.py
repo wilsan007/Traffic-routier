@@ -64,7 +64,9 @@ class StreamStatus(BaseModel):
     frames_processed: int
     motion_events: int
     vehicles_detected: int
+    active_tracks: int
     plates_sent: int
+    tracking: bool
     last_plate: Optional[str]
     last_error: Optional[str]
 

@@ -26,14 +26,24 @@ import cv2
 import requests
 
 from motion_detector import MotionDetector
+from plate_vote import VoteBook
 
 logger = logging.getLogger("stream_worker")
 
 API_URL = os.environ.get("API_URL", "http://api:3001")
 SERVICE_API_KEY = os.environ.get("SERVICE_API_KEY", "dev-service-key")
 SAMPLE_INTERVAL = float(os.environ.get("STREAM_SAMPLE_INTERVAL", "2.0"))
+# En mode suivi (ByteTrack), on échantillonne plus souvent : le suivi a besoin
+# de frames rapprochées pour associer un véhicule d'une image à l'autre. L'OCR
+# reste borné (une fois par véhicule non encore émis), donc le surcoût est
+# maîtrisé.
+TRACK_SAMPLE_INTERVAL = float(os.environ.get("STREAM_TRACK_SAMPLE_INTERVAL", "0.3"))
 PLATE_COOLDOWN = float(os.environ.get("STREAM_PLATE_COOLDOWN", "60.0"))
 MIN_CONFIDENCE = float(os.environ.get("STREAM_MIN_CONFIDENCE", "0.5"))
+# Mode de suivi : "auto" active ByteTrack + vote temporel si le modèle est
+# disponible (sinon repli), "off" force le pipeline simple (mouvement +
+# heuristique + cooldown).
+TRACKING = os.environ.get("STREAM_TRACKING", "auto").lower()
 # Marge (fraction) ajoutée autour de la boîte du véhicule avant l'ALPR : la
 # détection de mouvement/véhicule peut rogner légèrement la plaque (pare-chocs,
 # bord de la boîte), on élargit un peu le recadrage pour ne pas la couper.
@@ -53,7 +63,9 @@ class StreamInfo:
     frames_processed: int = 0
     motion_events: int = 0
     vehicles_detected: int = 0
+    active_tracks: int = 0
     plates_sent: int = 0
+    tracking: bool = False
     last_error: str | None = None
     last_plate: str | None = None
     started_at: float = field(default_factory=time.time)
@@ -65,9 +77,30 @@ class StreamWorker(threading.Thread):
         self.info = info
         self._recent_plates: dict[str, float] = {}
         self._motion = MotionDetector()
+        # Suivi (ByteTrack) + vote temporel : chargés paresseusement au premier
+        # traitement de frame pour ne pas payer le chargement du modèle si le
+        # flux n'est jamais joignable, et pour rester léger dans les tests.
+        self._tracker = None
+        self._tracker_built = False
+        self._votes = VoteBook()
+        self._seen_tracks: set[int] = set()
 
     def stop(self):
         self.info.running = False
+
+    def _ensure_tracker(self):
+        """Construit (une fois) le tracker de véhicules si le mode suivi est
+        actif. Renvoie un VehicleTracker (éventuellement indisponible) ou None
+        si le suivi est désactivé par configuration."""
+        if TRACKING == "off":
+            return None
+        if not self._tracker_built:
+            from vehicle_tracker import VehicleTracker
+
+            self._tracker = VehicleTracker()
+            self._tracker_built = True
+            self.info.tracking = self._tracker.available
+        return self._tracker
 
     def _should_send(self, plate: str) -> bool:
         """True si la plaque doit être envoyée (jamais vue ou cooldown expiré).
@@ -137,8 +170,64 @@ class StreamWorker(threading.Thread):
             return False
 
     def _process_frame(self, frame):
-        """Applique le pipeline mouvement → véhicule → plaque à une frame et
-        envoie les plaques retenues. Isolé pour être testable unitairement."""
+        """Aiguille vers le pipeline suivi (ByteTrack + vote temporel) si le
+        tracker est disponible, sinon vers le pipeline simple (mouvement +
+        heuristique + cooldown)."""
+        tracker = self._ensure_tracker()
+        if tracker is not None and tracker.available:
+            self._process_frame_tracked(frame, tracker)
+        else:
+            self._process_frame_simple(frame)
+
+    def _process_frame_tracked(self, frame, tracker):
+        """Pipeline avec suivi : mouvement → détection+suivi véhicules
+        (ByteTrack) → OCR par véhicule → vote temporel → une capture par
+        véhicule (track ID) une fois le consensus atteint."""
+        # 1. Mouvement : pré-filtre bon marché, évite YOLO sur une route vide.
+        if not self._motion.detect(frame):
+            self.info.active_tracks = self._votes.active_count()
+            self._votes.prune()
+            return
+        self.info.motion_events += 1
+
+        # 2. Détection + suivi : chaque véhicule reçoit un identifiant persistant.
+        vehicles = tracker.update(frame)
+        for vehicle in vehicles:
+            tid = vehicle.track_id
+            if tid not in self._seen_tracks:
+                self._seen_tracks.add(tid)
+                self.info.vehicles_detected += 1
+
+            self._votes.touch(tid)
+            # Véhicule déjà émis : inutile de refaire l'OCR tant qu'il traîne.
+            if self._votes.is_emitted(tid):
+                continue
+
+            # 3. Plaque : OCR sur le véhicule recadré, alimente le vote.
+            result = self._read_plate(self._crop_vehicle(frame, vehicle))
+            if result and result.plate_text:
+                self._votes.add(tid, result.plate_text, result.confidence)
+
+            # 4. Émission au consensus, une seule fois par véhicule.
+            if self._votes.should_emit(tid):
+                win = self._votes.winner(tid)
+                if self._should_send(win.text):
+                    if self._send_capture(frame, win.text, win.confidence):
+                        self._votes.mark_emitted(tid)
+                    else:
+                        # Échec transitoire : on annule le cooldown pour
+                        # réessayer au prochain passage.
+                        self._recent_plates.pop(win.text, None)
+                else:
+                    # Même plaque déjà envoyée récemment (autre track / réentrée).
+                    self._votes.mark_emitted(tid)
+
+        self.info.active_tracks = self._votes.active_count()
+        self._votes.prune()
+
+    def _process_frame_simple(self, frame):
+        """Pipeline sans suivi (repli) : mouvement → heuristique/DL véhicule →
+        ALPR → déduplication par cooldown de plaque."""
         import vehicle_detector
 
         # 1. Mouvement : rien ne bouge → on n'analyse pas.
@@ -187,8 +276,13 @@ class StreamWorker(threading.Thread):
                     self.info.last_error = "fin de flux / frame illisible"
                     break
 
+                # Cadence : plus rapprochée en mode suivi (ByteTrack a besoin de
+                # frames proches pour associer les véhicules), sinon intervalle
+                # d'échantillonnage standard.
+                tracker = self._ensure_tracker()
+                interval = TRACK_SAMPLE_INTERVAL if (tracker and tracker.available) else SAMPLE_INTERVAL
                 now = time.time()
-                if now - last_analysis < SAMPLE_INTERVAL:
+                if now - last_analysis < interval:
                     continue
                 last_analysis = now
                 self.info.frames_processed += 1

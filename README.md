@@ -38,29 +38,39 @@ Flux d'une capture (image unique) : caméra/mobile → `POST /captures` (NestJS)
 ### Pipeline flux vidéo temps réel (RTSP/HTTP)
 
 Au-delà de l'upload d'une image ponctuelle, le service ML traite des **flux
-vidéo continus** via un pipeline intelligent à trois étages, plutôt que de
-lancer l'OCR aveuglément sur chaque frame :
+vidéo continus** via un pipeline intelligent, plutôt que de lancer l'OCR
+aveuglément sur chaque frame :
 
 1. **Détection de mouvement** (`motion_detector.py`) — soustraction de fond
    MOG2 : sur une caméra fixe, les frames sans mouvement sont ignorées (route
    vide → aucun calcul lourd, aucun faux positif).
-2. **Classification véhicule** (`vehicle_detector.py`) — parmi ce qui bouge, on
-   ne garde que ce qui est un véhicule (piéton, vélo, animal écartés) puis on
-   recadre dessus. Heuristique géométrique par défaut (sans dépendance) ;
-   détecteur deep learning optionnel (ultralytics YOLO) si le paquet est
-   installé, avec repli automatique. Activation :
-   `pip install -r requirements.txt -r requirements-ml.txt` (ou image Docker
-   `--build-arg ENABLE_VEHICLE_DL=1`). L'état est visible sur `/health`
-   (`vehicle_deep_learning`).
+2. **Détection + suivi des véhicules** — parmi ce qui bouge, on ne garde que les
+   véhicules (piéton, vélo, animal écartés) et on les recadre. Deux modes, avec
+   repli automatique :
+   - **Suivi ByteTrack** (`vehicle_tracker.py`, mode `auto`) : YOLO (ultralytics,
+     backend PyTorch **ou ONNX Runtime** via `VEHICLE_MODEL=*.onnx`) + ByteTrack
+     attribuent à chaque véhicule un **identifiant persistant** d'une frame à
+     l'autre.
+   - **Heuristique géométrique** (`vehicle_detector.py`) : repli sans dépendance
+     quand le modèle n'est pas installé.
 3. **Lecture de plaque** (`dl_detector.py` → `plate_detector.py`) — ALPR sur la
-   région du véhicule, déduplication par plaque (cooldown), puis envoi à l'API
-   (`POST /captures/stream`).
+   région du véhicule (détecteur plaques ONNX + repli Tesseract).
+4. **Vote temporel** (`plate_vote.py`, en mode suivi) — la plaque d'un véhicule
+   suivi est lue sur plusieurs frames ; on agrège les lectures par identifiant
+   et on n'émet **qu'une capture par véhicule**, une fois le consensus atteint
+   (plus robuste qu'une lecture unique). Sans suivi, on retombe sur une
+   déduplication par cooldown de plaque. Envoi final : `POST /captures/stream`.
 
-Gestion des flux : `POST /streams` (démarrer), `GET /streams` (état :
-frames analysées, événements de mouvement, véhicules détectés, plaques
+Activation du suivi/DL : `pip install -r requirements.txt -r requirements-ml.txt`
+(ultralytics + torch CPU + ByteTrack), ou image Docker
+`--build-arg ENABLE_VEHICLE_DL=1`. État visible sur `/health`
+(`vehicle_deep_learning`).
+
+Gestion des flux : `POST /streams` (démarrer), `GET /streams` (état : frames
+analysées, mouvements, véhicules distincts, tracks actifs, mode suivi, plaques
 envoyées), `DELETE /streams/{id}` (arrêter). Réglages via variables
-d'environnement (`STREAM_SAMPLE_INTERVAL`, `MOTION_MIN_AREA_RATIO`,
-`VEHICLE_MIN_AREA_RATIO`, `STREAM_PLATE_COOLDOWN`, `STREAM_MIN_CONFIDENCE`…).
+d'environnement (`STREAM_TRACKING`, `VEHICLE_MODEL`, `PLATE_VOTE_MIN_SAMPLES`,
+`STREAM_SAMPLE_INTERVAL`, `MOTION_MIN_AREA_RATIO`, `STREAM_MIN_CONFIDENCE`…).
 
 ## Stack technique
 

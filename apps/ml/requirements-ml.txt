@@ -16,3 +16,6 @@
 torch==2.5.1
 torchvision==0.20.1
 ultralytics==8.3.0
+# lap : résolution d'assignation linéaire utilisée par ByteTrack (suivi). Épinglé
+# ici pour éviter qu'ultralytics ne le télécharge à la première frame suivie.
+lap==0.5.13

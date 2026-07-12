@@ -14,7 +14,7 @@ COPY requirements.txt requirements-ml.txt ./
 #     docker build --build-arg ENABLE_VEHICLE_DL=1 ...
 # pour installer ultralytics + torch CPU et pré-embarquer les poids YOLO.
 ARG ENABLE_VEHICLE_DL=0
-ARG VEHICLE_MODEL=yolov8n.pt
+ARG VEHICLE_MODEL=yolo11n.pt
 
 RUN pip install --no-cache-dir -r requirements.txt \
     && if [ "$ENABLE_VEHICLE_DL" = "1" ]; then \

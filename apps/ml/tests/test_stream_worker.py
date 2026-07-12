@@ -11,6 +11,14 @@ import stream_worker as sw
 from stream_worker import StreamInfo, StreamManager, StreamWorker
 
 
+@pytest.fixture(autouse=True)
+def _tracking_off(monkeypatch):
+    """Désactive le suivi (ByteTrack) par défaut dans les tests : évite tout
+    chargement/téléchargement réel du modèle YOLO et garde le pipeline simple.
+    Les tests du mode suivi injectent explicitement un tracker factice."""
+    monkeypatch.setattr(sw, "TRACKING", "off")
+
+
 # --------------------------------------------------------------------------
 # StreamWorker._should_send (dedup / cooldown)
 # --------------------------------------------------------------------------
@@ -301,3 +309,114 @@ class TestProcessFramePipeline:
         worker._process_frame(self._frame())
         worker._process_frame(self._frame())  # meme plaque, dans le cooldown
         assert calls == ["AB123CD"]  # envoyee une seule fois
+
+
+# --------------------------------------------------------------------------
+# StreamWorker._process_frame_tracked : suivi ByteTrack + vote temporel
+# --------------------------------------------------------------------------
+
+from vehicle_tracker import TrackedVehicle
+
+
+class _FakeTracker:
+    """Tracker factice : renvoie une séquence prédéfinie de listes de véhicules,
+    une par appel update()."""
+    available = True
+
+    def __init__(self, frames):
+        self._frames = list(frames)
+        self._i = 0
+
+    def update(self, frame):
+        if self._i < len(self._frames):
+            out = self._frames[self._i]
+        else:
+            out = self._frames[-1] if self._frames else []
+        self._i += 1
+        return out
+
+
+def _veh(track_id, conf=0.9):
+    return TrackedVehicle(track_id=track_id, x=40, y=50, width=120, height=80,
+                          confidence=conf, label="car")
+
+
+class TestTrackedPipeline:
+    def _worker(self):
+        info = StreamInfo(id="t1", url="file:///x", camera_id="cam-7")
+        w = StreamWorker(info)
+        # Le mouvement est toujours "présent" pour laisser passer le pipeline.
+        w._motion.detect = lambda frame: [object()]
+        return w
+
+    def _frame(self):
+        return np.zeros((240, 320, 3), dtype=np.uint8)
+
+    def test_routes_to_tracked_when_tracker_available(self, monkeypatch):
+        monkeypatch.setattr(sw, "TRACKING", "auto")
+        worker = self._worker()
+        tracker = _FakeTracker([[_veh(1)]])
+        worker._tracker = tracker
+        worker._tracker_built = True
+        called = {"tracked": False}
+        monkeypatch.setattr(worker, "_process_frame_tracked",
+                            lambda frame, tk: called.__setitem__("tracked", True))
+        worker._process_frame(self._frame())
+        assert called["tracked"] is True
+
+    def test_consensus_emits_once_after_min_samples(self, monkeypatch):
+        monkeypatch.setattr(sw, "MIN_CONFIDENCE", 0.5)
+        worker = self._worker()
+        # Même véhicule (track 1) vu sur plusieurs frames.
+        tracker = _FakeTracker([[_veh(1)], [_veh(1)], [_veh(1)], [_veh(1)]])
+        # OCR renvoie toujours la même plaque fiable.
+        monkeypatch.setattr(worker, "_read_plate", lambda img: _Result("AB123CD", 0.9))
+        sent = []
+        monkeypatch.setattr(worker, "_send_capture",
+                            lambda frame, plate, conf: sent.append(plate) or True)
+
+        for _ in range(4):
+            worker._process_frame_tracked(self._frame(), tracker)
+
+        # VOTE_MIN_SAMPLES=3 par défaut : émis une seule fois malgré 4 lectures.
+        assert sent == ["AB123CD"]
+        assert worker.info.vehicles_detected == 1  # un seul track distinct
+
+    def test_no_emit_before_min_samples(self, monkeypatch):
+        worker = self._worker()
+        tracker = _FakeTracker([[_veh(1)], [_veh(1)]])  # 2 lectures seulement
+        monkeypatch.setattr(worker, "_read_plate", lambda img: _Result("AB123CD", 0.9))
+        sent = []
+        monkeypatch.setattr(worker, "_send_capture", lambda *a: sent.append(a) or True)
+        for _ in range(2):
+            worker._process_frame_tracked(self._frame(), tracker)
+        assert sent == []  # pas encore le quorum
+
+    def test_distinct_tracks_counted_separately(self, monkeypatch):
+        worker = self._worker()
+        tracker = _FakeTracker([[_veh(1), _veh(2)]])
+        monkeypatch.setattr(worker, "_read_plate", lambda img: _Result("", 0.0))
+        monkeypatch.setattr(worker, "_send_capture", lambda *a: True)
+        worker._process_frame_tracked(self._frame(), tracker)
+        assert worker.info.vehicles_detected == 2
+
+    def test_emitted_track_skips_ocr(self, monkeypatch):
+        worker = self._worker()
+        tracker = _FakeTracker([[_veh(1)]])
+        # Marque le track comme déjà émis.
+        worker._votes.touch(1)
+        worker._votes.mark_emitted(1)
+        calls = []
+        monkeypatch.setattr(worker, "_read_plate", lambda img: calls.append(1) or _Result("X", 0.9))
+        worker._process_frame_tracked(self._frame(), tracker)
+        assert calls == []  # OCR non appelé pour un véhicule déjà traité
+
+    def test_no_motion_skips_tracker(self, monkeypatch):
+        worker = self._worker()
+        worker._motion.detect = lambda frame: []  # rien ne bouge
+        tracker = _FakeTracker([[_veh(1)]])
+        monkeypatch.setattr(worker, "_read_plate",
+                            lambda img: (_ for _ in ()).throw(AssertionError("pas d'OCR")))
+        worker._process_frame_tracked(self._frame(), tracker)
+        assert worker.info.motion_events == 0
+        assert worker.info.vehicles_detected == 0

@@ -45,7 +45,7 @@ VEHICLE_MIN_FILL = float(os.environ.get("VEHICLE_MIN_FILL", "0.35"))
 
 # Classes COCO considérées comme véhicules (si le détecteur ML est présent).
 _VEHICLE_COCO_CLASSES = {"car", "truck", "bus", "motorcycle"}
-VEHICLE_MODEL = os.environ.get("VEHICLE_MODEL", "yolov8n.pt")
+VEHICLE_MODEL = os.environ.get("VEHICLE_MODEL", "yolo11n.pt")
 VEHICLE_ML_CONFIDENCE = float(os.environ.get("VEHICLE_ML_CONFIDENCE", "0.35"))
 
 _model = None
