@@ -10,9 +10,9 @@ onnxruntime==1.20.1
 requests==2.32.3
 
 # --- Optionnel : détection de véhicules deep learning pour le pipeline flux ---
-# Décommenter pour activer la classification véhicule par YOLO (classes COCO
-# car/truck/bus/motorcycle) à la place de l'heuristique géométrique. Volontaire-
-# ment désactivé par défaut : ultralytics tire torch (lourd, inadapté à
-# l'hébergement gratuit). Le pipeline retombe automatiquement sur l'heuristique
-# si ce paquet est absent.
-# ultralytics==8.3.0
+# La classification véhicule par YOLO (classes COCO car/truck/bus/motorcycle)
+# est fournie en dépendance optionnelle dans requirements-ml.txt (ultralytics +
+# torch CPU). Volontairement séparée : torch est lourd et inadapté à
+# l'hébergement gratuit. Sans elle, le pipeline retombe automatiquement sur
+# l'heuristique géométrique.
+#     pip install -r requirements.txt -r requirements-ml.txt

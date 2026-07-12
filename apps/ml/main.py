@@ -9,6 +9,7 @@ from typing import Optional
 
 from plate_detector import detect_plate
 from dl_detector import detect_plate_dl, dl_available
+from vehicle_detector import ml_available as vehicle_ml_available
 from stream_worker import manager as stream_manager
 
 app = FastAPI(
@@ -73,6 +74,7 @@ def health():
     return {
         "status": "ok",
         "deep_learning": dl_available(),
+        "vehicle_deep_learning": vehicle_ml_available(),
         "active_streams": len(stream_manager.list()),
     }
 

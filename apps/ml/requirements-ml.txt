@@ -1,0 +1,18 @@
+# Dépendances OPTIONNELLES : détection de véhicules par deep learning
+# (ultralytics YOLO) pour le pipeline flux vidéo.
+#
+# Activation :
+#     pip install -r requirements.txt -r requirements-ml.txt
+#
+# Sans ces paquets, le pipeline retombe automatiquement sur l'heuristique
+# géométrique (vehicle_detector.py) — le service fonctionne dans les deux cas.
+#
+# torch est épinglé sur l'index CPU : sur un serveur sans GPU (cas de
+# l'hébergement standard), cela évite de télécharger plusieurs Go de wheels
+# CUDA inutiles. Retirer l'--extra-index-url si vous déployez sur GPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+-r requirements.txt
+torch==2.5.1
+torchvision==0.20.1
+ultralytics==8.3.0

@@ -8,9 +8,20 @@ l'environnement de test → `classify` utilise l'heuristique.
 from dataclasses import dataclass
 
 import numpy as np
+import pytest
 
 import vehicle_detector
 from vehicle_detector import VehicleBox, classify
+
+
+@pytest.fixture(autouse=True)
+def _no_ml_download(monkeypatch):
+    """Empêche tout chargement/téléchargement réel du modèle deep learning
+    pendant les tests : le chemin ML est neutralisé par défaut (repli
+    heuristique). Les tests qui veulent simuler le ML patchent _detect_ml
+    explicitement, ce qui prime sur cette fixture."""
+    monkeypatch.setattr(vehicle_detector, "_load_failed", True)
+    monkeypatch.setattr(vehicle_detector, "_model", None)
 
 
 @dataclass

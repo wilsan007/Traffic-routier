@@ -48,7 +48,10 @@ lancer l'OCR aveuglément sur chaque frame :
    ne garde que ce qui est un véhicule (piéton, vélo, animal écartés) puis on
    recadre dessus. Heuristique géométrique par défaut (sans dépendance) ;
    détecteur deep learning optionnel (ultralytics YOLO) si le paquet est
-   installé, avec repli automatique.
+   installé, avec repli automatique. Activation :
+   `pip install -r requirements.txt -r requirements-ml.txt` (ou image Docker
+   `--build-arg ENABLE_VEHICLE_DL=1`). L'état est visible sur `/health`
+   (`vehicle_deep_learning`).
 3. **Lecture de plaque** (`dl_detector.py` → `plate_detector.py`) — ALPR sur la
    région du véhicule, déduplication par plaque (cooldown), puis envoi à l'API
    (`POST /captures/stream`).
