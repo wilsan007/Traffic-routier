@@ -1,0 +1,13 @@
+# Smoke test Maestro : lance l'app (APK avec modules natifs react-native-webrtc
+# + ML Kit) sur l'émulateur et ouvre les deux écrans avancés via deep link.
+# But : prouver que l'APK s'installe, démarre sans crash (linking natif OK) et
+# que les écrans /live et /offline-scan s'affichent. On capture des captures
+# d'écran comme artefacts ; un crash ferait échouer launchApp/openLink.
+appId: local.trafficguard.mobile
+---
+- launchApp
+- takeScreenshot: 01-launch
+- openLink: trafficguard://offline-scan
+- takeScreenshot: 02-offline-scan
+- openLink: trafficguard://live
+- takeScreenshot: 03-live

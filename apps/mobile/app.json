@@ -40,7 +40,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "TrafficGuard utilise la localisation pour géolocaliser les captures."
         }
-      ]
+      ],
+      "@config-plugins/react-native-webrtc"
     ],
     "extra": {
       "apiUrl": "https://trafficguard-api-ftqe.onrender.com",

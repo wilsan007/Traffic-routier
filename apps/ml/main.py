@@ -9,6 +9,7 @@ from typing import Optional
 
 from plate_detector import detect_plate
 from dl_detector import detect_plate_dl, dl_available
+from vehicle_detector import ml_available as vehicle_ml_available
 from stream_worker import manager as stream_manager
 
 app = FastAPI(
@@ -61,7 +62,11 @@ class StreamStatus(BaseModel):
     camera_id: Optional[str]
     running: bool
     frames_processed: int
+    motion_events: int
+    vehicles_detected: int
+    active_tracks: int
     plates_sent: int
+    tracking: bool
     last_plate: Optional[str]
     last_error: Optional[str]
 
@@ -71,6 +76,7 @@ def health():
     return {
         "status": "ok",
         "deep_learning": dl_available(),
+        "vehicle_deep_learning": vehicle_ml_available(),
         "active_streams": len(stream_manager.list()),
     }
 

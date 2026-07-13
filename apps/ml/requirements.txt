@@ -8,3 +8,11 @@ pillow==10.4.0
 fast-alpr[onnx]==0.4.0
 onnxruntime==1.20.1
 requests==2.32.3
+
+# --- Optionnel : détection de véhicules deep learning pour le pipeline flux ---
+# La classification véhicule par YOLO (classes COCO car/truck/bus/motorcycle)
+# est fournie en dépendance optionnelle dans requirements-ml.txt (ultralytics +
+# torch CPU). Volontairement séparée : torch est lourd et inadapté à
+# l'hébergement gratuit. Sans elle, le pipeline retombe automatiquement sur
+# l'heuristique géométrique.
+#     pip install -r requirements.txt -r requirements-ml.txt

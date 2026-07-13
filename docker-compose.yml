@@ -40,9 +40,13 @@ services:
       - MTX_HLS=yes
       - MTX_HLSADDRESS=:8888
       - MTX_HLSALLOWORIGIN=*
+      # WebRTC/WHIP : ingestion du flux caméra publié par les mobiles.
+      - MTX_WEBRTC=yes
+      - MTX_WEBRTCADDRESS=:8889
     ports:
       - "8554:8554" # RTSP
       - "8888:8888" # HLS (navigateur)
+      - "8889:8889" # WebRTC / WHIP (publication mobile)
       - "9997:9997" # API de configuration
     volumes:
       - mediamtx_recordings:/recordings

@@ -39,4 +39,50 @@ export class MlClientService {
       return { plateText: '', confidence: 0 };
     }
   }
+
+  // --- Contrôle des flux vidéo continus (worker ML /streams) ---
+
+  /** Démarre le traitement continu d'un flux (RTSP/HTTP) par le worker ML.
+   * Renvoie l'identifiant du flux ML, ou null en cas d'échec. */
+  async startStream(url: string, cameraId?: string): Promise<{ id: string } | null> {
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/streams`,
+        { url, camera_id: cameraId ?? null },
+        { headers: { 'x-api-key': this.serviceApiKey }, timeout: 15000 },
+      );
+      return { id: response.data.id as string };
+    } catch (error) {
+      this.logger.error(`Échec démarrage flux ML: ${(error as Error).message}`);
+      return null;
+    }
+  }
+
+  /** Arrête un flux ML par identifiant. Renvoie true si l'arrêt a réussi. */
+  async stopStream(streamId: string): Promise<boolean> {
+    try {
+      await axios.delete(`${this.baseUrl}/streams/${streamId}`, {
+        headers: { 'x-api-key': this.serviceApiKey },
+        timeout: 10000,
+      });
+      return true;
+    } catch (error) {
+      this.logger.warn(`Échec arrêt flux ML ${streamId}: ${(error as Error).message}`);
+      return false;
+    }
+  }
+
+  /** Liste l'état des flux ML actifs (diagnostic). */
+  async listStreams(): Promise<unknown[]> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/streams`, {
+        headers: { 'x-api-key': this.serviceApiKey },
+        timeout: 10000,
+      });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      this.logger.warn(`Échec liste flux ML: ${(error as Error).message}`);
+      return [];
+    }
+  }
 }
