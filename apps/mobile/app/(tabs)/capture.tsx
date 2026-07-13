@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Scr
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
+import { useRouter } from 'expo-router';
 import { api, API_URL, getToken } from '../../lib/api';
 import { getAlertsSocket } from '../../lib/socket';
 
@@ -25,6 +26,7 @@ interface ScanResult {
 }
 
 export default function CaptureScreen() {
+  const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -353,6 +355,17 @@ export default function CaptureScreen() {
         facing="back"
         mode={recording ? 'video' : 'picture'}
       />
+      {/* Accès aux modes avancés : diffusion en direct (serveur) et scan
+          hors-ligne embarqué. Les écrans cibles gèrent la disponibilité des
+          modules natifs (development build requis) et retombent proprement. */}
+      <View style={styles.modeBar}>
+        <TouchableOpacity style={styles.modeButton} onPress={() => router.push('/live')}>
+          <Text style={styles.modeButtonText}>🔴 Direct</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.modeButton} onPress={() => router.push('/offline-scan')}>
+          <Text style={styles.modeButtonText}>📴 Hors-ligne</Text>
+        </TouchableOpacity>
+      </View>
       {/* Overlay live — plaque détectée en temps réel */}
       {livePlate && (
         <View style={styles.liveOverlay}>
@@ -406,6 +419,20 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   camera: { flex: 1 },
+  modeBar: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modeButton: {
+    backgroundColor: 'rgba(15, 18, 32, 0.72)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  modeButtonText: { color: 'white', fontWeight: '600', fontSize: 13 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   permissionText: { textAlign: 'center', marginBottom: 16, color: '#334155' },
   shutterButton: {
