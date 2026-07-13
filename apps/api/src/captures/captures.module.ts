@@ -12,6 +12,6 @@ import { TollsModule } from '../tolls/tolls.module';
   imports: [HotlistModule, AlertsModule, PatternsModule, TollsModule],
   providers: [CapturesService, MlClientService],
   controllers: [CapturesController, StreamIngestController],
-  exports: [CapturesService],
+  exports: [CapturesService, MlClientService],
 })
 export class CapturesModule {}

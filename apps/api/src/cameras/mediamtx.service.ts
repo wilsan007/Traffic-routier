@@ -9,12 +9,18 @@ import { PrismaService } from '../prisma/prisma.service';
 export class MediamtxService implements OnModuleInit {
   private readonly logger = new Logger(MediamtxService.name);
   private readonly apiUrl: string;
+  private readonly whipBase: string;
+  private readonly rtspBase: string;
 
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
   ) {
     this.apiUrl = this.config.get<string>('MEDIAMTX_API_URL') ?? 'http://localhost:9997';
+    // Bases d'URL pour la publication depuis un mobile (WHIP/WebRTC) et la
+    // relecture RTSP consommée par le worker ML.
+    this.whipBase = this.config.get<string>('MEDIAMTX_WHIP_URL') ?? 'http://localhost:8889';
+    this.rtspBase = this.config.get<string>('MEDIAMTX_RTSP_URL') ?? 'rtsp://localhost:8554';
   }
 
   async onModuleInit() {
@@ -60,6 +66,44 @@ export class MediamtxService implements OnModuleInit {
       }
     }
     return true;
+  }
+
+  // Prépare un chemin MediaMTX qui ACCEPTE une publication (téléphone qui
+  // pousse son flux via WHIP/WebRTC), contrairement à syncCamera qui définit
+  // une `source` à tirer. Un chemin sans `source` accepte les publieurs.
+  async ensurePublishPath(cameraId: string, record = false) {
+    const pathConfig = {
+      sourceOnDemand: false,
+      record,
+      recordPath: `/recordings/${cameraId}/%Y-%m-%d_%H-%M-%S-%f`,
+    };
+    try {
+      await axios.post(`${this.apiUrl}/v3/config/paths/add/${cameraId}`, pathConfig, {
+        timeout: 5000,
+      });
+    } catch {
+      try {
+        await axios.patch(`${this.apiUrl}/v3/config/paths/patch/${cameraId}`, pathConfig, {
+          timeout: 5000,
+        });
+      } catch (error) {
+        this.logger.warn(
+          `Échec de préparation du chemin de publication ${cameraId}: ${(error as Error).message}`,
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // URL WHIP où le mobile publie son flux (WebRTC ingest).
+  whipUrl(cameraId: string): string {
+    return `${this.whipBase.replace(/\/$/, '')}/${cameraId}/whip`;
+  }
+
+  // URL RTSP que le worker ML consomme (POST /streams).
+  rtspUrl(cameraId: string): string {
+    return `${this.rtspBase.replace(/\/$/, '')}/${cameraId}`;
   }
 
   async removeCamera(cameraId: string) {
