@@ -40,6 +40,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "TrafficGuard utilise la localisation pour géolocaliser les captures."
         }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "TrafficGuard a besoin de la caméra pour le flux continu de reconnaissance de plaques.",
+          "enableCodeScanner": false
+        }
       ]
     ],
     "extra": {

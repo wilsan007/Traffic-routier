@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { CapturesService } from './captures.service';
 import { VerifyCaptureDto } from './dto/verify-capture.dto';
+import { ScanPlateDto } from './dto/scan-plate.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -64,6 +65,17 @@ export class CapturesController {
       officerId: user.userId,
       latitude: latitude ? parseFloat(latitude) : undefined,
       longitude: longitude ? parseFloat(longitude) : undefined,
+    });
+  }
+
+  // Scan par texte de plaque (OCR embarqué on-device) : pas d'image.
+  @Post('scan-plate')
+  scanPlate(@Body() dto: ScanPlateDto, @CurrentUser() user: { userId: string }) {
+    return this.capturesService.scanPlate({
+      plate: dto.plate,
+      officerId: user.userId,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
     });
   }
 

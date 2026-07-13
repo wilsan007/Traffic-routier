@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { MlClientService } from './ml-client.service';
@@ -19,8 +19,12 @@ const OFFICER_SAFE_SELECT = {
   role: true,
 } as const;
 
+// Sentinelle utilisée quand une capture est persistée sans image
+// (reconnaissance OCR embarquée on-device : on a la plaque, pas la photo).
+export const NO_IMAGE_SENTINEL = 'ondevice://no-image';
+
 export interface IngestCaptureParams {
-  imageBuffer: Buffer;
+  imageBuffer?: Buffer;
   cameraId?: string;
   officerId?: string;
   latitude?: number;
@@ -56,12 +60,21 @@ export class CapturesService {
     return this.prisma.vehicle.findUnique({ where: { id: rows[0].id } });
   }
 
+  // Résout la détection : soit fournie en amont (preDetected / OCR on-device),
+  // soit calculée par le service ML à partir de l'image. Lève si aucune source.
+  private async resolveDetection(params: IngestCaptureParams) {
+    if (params.preDetected) return params.preDetected;
+    if (!params.imageBuffer) {
+      throw new BadRequestException('Image ou plaque pré-détectée requise.');
+    }
+    return this.mlClient.detectPlate(params.imageBuffer);
+  }
+
   // Scan éphémère : OCR + vérification hotlist SANS stockage.
   // Retourne plaque + véhicule + alertes. Si une correspondance hotlist
   // est trouvée, persiste la capture + crée l'alerte via ingest().
   async scan(params: IngestCaptureParams) {
-    const detection =
-      params.preDetected ?? (await this.mlClient.detectPlate(params.imageBuffer));
+    const detection = await this.resolveDetection(params);
     const normalized = detection.plateText.toUpperCase().replace(/\s+/g, '');
 
     let vehicle = normalized
@@ -105,10 +118,28 @@ export class CapturesService {
     };
   }
 
+  // Scan par texte de plaque (OCR embarqué on-device) : aucune image envoyée,
+  // la reconnaissance a déjà eu lieu sur l'appareil. Réutilise entièrement la
+  // logique de correspondance véhicule + hotlist + alertes de `scan`.
+  async scanPlate(params: {
+    plate: string;
+    officerId?: string;
+    latitude?: number;
+    longitude?: number;
+  }) {
+    return this.scan({
+      officerId: params.officerId,
+      latitude: params.latitude,
+      longitude: params.longitude,
+      preDetected: { plateText: params.plate, confidence: 1 },
+    });
+  }
+
   async ingest(params: IngestCaptureParams) {
-    const imageUrl = await this.storage.uploadCaptureImage(params.imageBuffer);
-    const detection =
-      params.preDetected ?? (await this.mlClient.detectPlate(params.imageBuffer));
+    const imageUrl = params.imageBuffer
+      ? await this.storage.uploadCaptureImage(params.imageBuffer)
+      : NO_IMAGE_SENTINEL;
+    const detection = await this.resolveDetection(params);
     const normalized = detection.plateText.toUpperCase().replace(/\s+/g, '');
 
     let fuzzyMatch = false;

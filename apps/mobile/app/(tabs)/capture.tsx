@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Switch } from 'react-native';
+import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -25,6 +26,7 @@ interface ScanResult {
 }
 
 export default function CaptureScreen() {
+  const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -353,6 +355,12 @@ export default function CaptureScreen() {
         facing="back"
         mode={recording ? 'video' : 'picture'}
       />
+      {/* Accès au flux continu on-device (reconnaissance live sans serveur OCR) */}
+      {!recording && (
+        <TouchableOpacity style={styles.streamButton} onPress={() => router.push('/stream-scan')}>
+          <Text style={styles.streamButtonText}>🎥 Flux continu on-device</Text>
+        </TouchableOpacity>
+      )}
       {/* Overlay live — plaque détectée en temps réel */}
       {livePlate && (
         <View style={styles.liveOverlay}>
@@ -514,4 +522,14 @@ const styles = StyleSheet.create({
   },
   recordButtonActive: { backgroundColor: '#dc2626' },
   recordInner: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#dc2626' },
+  streamButton: {
+    position: 'absolute',
+    top: 50,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(47, 95, 219, 0.92)',
+    borderRadius: 22,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+  },
+  streamButtonText: { color: 'white', fontWeight: '700', fontSize: 14 },
 });

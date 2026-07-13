@@ -13,6 +13,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
           <Stack.Screen name="demo" />
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="stream-scan" />
         </Stack>
       </AuthProvider>
     </SafeAreaProvider>
