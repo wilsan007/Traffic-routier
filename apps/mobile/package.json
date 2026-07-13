@@ -11,11 +11,13 @@
     "eas-build-pre-install": "cd ../../ && npm install --legacy-peer-deps"
   },
   "dependencies": {
+    "@expo/config-plugins": "^57.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@trafficguard/shared": "*",
     "expo": "~54.0.0",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "^57.0.5",
     "expo-device": "~8.0.9",
     "expo-linking": "~8.0.12",
     "expo-location": "~19.0.8",
