@@ -1,0 +1,90 @@
+diff --git a/node_modules/react-native-vision-camera-text-recognition/android/build.gradle b/node_modules/react-native-vision-camera-text-recognition/android/build.gradle
+index c92292a..223e455 100644
+--- a/node_modules/react-native-vision-camera-text-recognition/android/build.gradle
++++ b/node_modules/react-native-vision-camera-text-recognition/android/build.gradle
+@@ -90,20 +90,14 @@ dependencies {
+   //noinspection GradleDynamicVersion
+   implementation "com.facebook.react:react-native:+"
+   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-devanagari:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1'
++  // Modeles ML Kit EMBARQUES dans l'APK (et non livres par Google Play Services).
++  // La variante 'com.google.android.gms:play-services-mlkit-text-recognition' telecharge
++  // le modele au premier usage : l'OCR echoue tant que le telechargement n'a pas abouti
++  // ("Waiting for the text optional module to be downloaded"), donc pas de reconnaissance
++  // hors ligne ni au premier lancement. Inacceptable pour une app terrain.
++  implementation 'com.google.mlkit:text-recognition:16.0.1'
+   implementation 'com.google.mlkit:translate:17.0.3'
+   implementation project(':react-native-vision-camera')
+   implementation "androidx.camera:camera-core:1.3.4"
+-
+-  // For using the models in Google Play Services
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-devanagari:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1'
+-  implementation 'com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1'
+ }
+ 
+diff --git a/node_modules/react-native-vision-camera-text-recognition/android/src/main/java/com/visioncameratextrecognition/VisionCameraTextRecognitionPlugin.kt b/node_modules/react-native-vision-camera-text-recognition/android/src/main/java/com/visioncameratextrecognition/VisionCameraTextRecognitionPlugin.kt
+index f48c947..f2bf081 100644
+--- a/node_modules/react-native-vision-camera-text-recognition/android/src/main/java/com/visioncameratextrecognition/VisionCameraTextRecognitionPlugin.kt
++++ b/node_modules/react-native-vision-camera-text-recognition/android/src/main/java/com/visioncameratextrecognition/VisionCameraTextRecognitionPlugin.kt
+@@ -10,10 +10,6 @@ import com.google.android.gms.tasks.Tasks
+ import com.google.mlkit.vision.common.InputImage
+ import com.google.mlkit.vision.text.Text
+ import com.google.mlkit.vision.text.TextRecognition
+-import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+-import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
+-import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+-import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
+ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+ import com.mrousavy.camera.frameprocessors.Frame
+ import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
+@@ -23,24 +19,12 @@ import java.util.HashMap
+ class VisionCameraTextRecognitionPlugin(proxy: VisionCameraProxy, options: Map<String, Any>?) :
+     FrameProcessorPlugin() {
+ 
+-    private var recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
++    // Seul le script latin est embarque : les modeles chinois/devanagari/japonais/coreen
++    // pesaient ~185 Mo dans l'APK pour rien. Les plaques djiboutiennes sont bilingues
++    // latin/arabe et portent le meme numero dans les deux graphies -> lire le latin suffit.
++    // (ML Kit n'offre de toute facon aucun modele arabe.)
+     private val latinOptions = TextRecognizerOptions.DEFAULT_OPTIONS
+-    private val chineseOptions = ChineseTextRecognizerOptions.Builder().build()
+-    private val devanagariOptions = DevanagariTextRecognizerOptions.Builder().build()
+-    private val japaneseOptions = JapaneseTextRecognizerOptions.Builder().build()
+-    private val koreanOptions = KoreanTextRecognizerOptions.Builder().build()
+-
+-    init {
+-        val language = options?.get("language").toString()
+-        recognizer = when (language) {
+-            "latin" -> TextRecognition.getClient(latinOptions)
+-            "chinese" -> TextRecognition.getClient(chineseOptions)
+-            "devanagari" -> TextRecognition.getClient(devanagariOptions)
+-            "japanese" -> TextRecognition.getClient(japaneseOptions)
+-            "korean" -> TextRecognition.getClient(koreanOptions)
+-            else -> TextRecognition.getClient(latinOptions)
+-        }
+-    }
++    private var recognizer = TextRecognition.getClient(latinOptions)
+ 
+     override fun callback(frame: Frame, arguments: Map<String, Any>?): HashMap<String, Any>? {
+         val data = WritableNativeMap()
+@@ -51,11 +35,11 @@ class VisionCameraTextRecognitionPlugin(proxy: VisionCameraProxy, options: Map<S
+         try {
+             val text: Text = Tasks.await(task)
+             if (text.text.isEmpty()) {
+-                return WritableNativeMap().toHashMap()
++                return WritableNativeMap().toHashMap() as HashMap<String, Any>
+             }
+             data.putString("resultText", text.text)
+             data.putArray("blocks", getBlocks(text.textBlocks))
+-            return data.toHashMap()
++            return data.toHashMap() as HashMap<String, Any>
+         } catch (e: Exception) {
+             e.printStackTrace()
+             return null
