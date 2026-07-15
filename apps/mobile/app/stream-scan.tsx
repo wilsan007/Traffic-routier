@@ -106,11 +106,30 @@ export default function StreamScanScreen() {
   }, []);
 
   // Callback OCR du plugin : appelé à chaque frame analysée.
+  // Le plugin natif Android renvoie UN objet { resultText, blocks } ; iOS (ou
+  // d'anciennes versions) peuvent renvoyer un tableau de blocs, et le mode
+  // translate une chaîne. On normalise toutes ces formes vers une liste de
+  // lignes de texte avant d'en extraire des plaques candidates.
   const onOcr = useCallback(
-    (data: string | OcrText[]) => {
-      if (!active || typeof data === 'string') return;
-      const lines = data.map((t) => t.resultText).filter(Boolean);
-      const candidates = extractCandidates(lines);
+    (data: unknown) => {
+      if (!active || data == null) return;
+
+      const lines: string[] = [];
+      const pushText = (s: unknown) => {
+        if (typeof s === 'string' && s.length > 0) lines.push(...s.split(/\r?\n/));
+      };
+      if (typeof data === 'string') {
+        pushText(data);
+      } else if (Array.isArray(data)) {
+        for (const block of data) pushText((block as OcrText)?.resultText);
+      } else if (typeof data === 'object') {
+        pushText((data as OcrText).resultText);
+      }
+
+      const clean = lines.map((l) => l.trim()).filter(Boolean);
+      if (clean.length === 0) return;
+
+      const candidates = extractCandidates(clean);
       const now = Date.now();
       const confirmed = voterRef.current.ingest(candidates, now);
       setTracked(voterRef.current.tracked);
