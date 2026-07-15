@@ -1,53 +1,52 @@
 /**
  * Format des plaques d'immatriculation djiboutiennes.
  *
- * Deux familles, de structures différentes :
+ * Trois familles reconnues, de structures différentes :
  *
- *  - Véhicules privés : la lettre `D` est INTERCALÉE entre les chiffres,
- *    3 chiffres · D · 2 chiffres — ex. « 123 D 45 ».
- *  - Véhicules officiels : la lettre TERMINE la plaque, précédée de 3 à 5
- *    chiffres, et rien après — ex. « 1234 A ».
- *    `A` et `B` = gouvernement, `C` = entreprises publiques.
- *
- * Ces deux familles couvrent l'intégralité du parc visé. Les plaques ONG,
- * ambassades et armée suivent d'autres conventions et sont VOLONTAIREMENT hors
- * périmètre : elles ne seront jamais reconnues, et c'est un choix, pas un oubli.
+ *   - Privé      `243 D 95`, `886 D 100`  — D intercalée, 3 chiffres avant,
+ *                                            2 ou 3 après.
+ *   - Officiel   `1234 A`                 — 3 à 5 chiffres puis la lettre finale.
+ *                                            A et B = gouvernement,
+ *                                            C = entreprises publiques.
+ *   - Transit    `3090 TT`                — 3 à 5 chiffres puis TT.
  *
  * Les plaques sont bilingues latin/arabe et portent le même numéro dans les deux
  * graphies : lire la partie latine suffit (ML Kit n'a de toute façon pas de
  * modèle arabe).
  *
- * Ce format strict est notre meilleur filtre : l'OCR embarqué lit TOUT le texte
- * visible (panneaux, publicités, inscriptions sur les camions), et seule une
- * validation de format permet d'écarter ce bruit.
+ * Hors périmètre : ONG (fond bleu), corps consulaire et diplomatique CC/CD
+ * (fond vert), armée. Leurs conventions diffèrent et ne seront jamais
+ * reconnues — c'est un choix, pas un oubli.
+ *
+ * ⚠️ Deux pièges vérifiés sur photos de plaques réelles :
+ *
+ *   1. Deux polices coexistent, au choix du client. En police « digitale »
+ *      (7 segments), le `D` est visuellement indiscernable d'un `0` : la même
+ *      plaque `163 D 69` se lit `163069`. Voir `normalizeDjiboutiPlate`.
+ *   2. La couleur du fond est porteuse de sens, pas décorative — un format
+ *      A/B/C/D sur un fond non noir est suspect. Voir `isBackgroundSuspicious`.
  *
  * Module pur (aucune dépendance native) → testable en isolation.
  */
 
-export type PlateCategory = 'PRIVE' | 'GOUVERNEMENT' | 'ENTREPRISE_PUBLIQUE';
+export type PlateCategory = 'PRIVE' | 'GOUVERNEMENT' | 'ENTREPRISE_PUBLIQUE' | 'TRANSIT';
 
-/** Lettre de catégorie → nature du véhicule. */
-export const PLATE_CATEGORIES: Readonly<Record<string, PlateCategory>> = {
-  D: 'PRIVE',
-  A: 'GOUVERNEMENT',
-  B: 'GOUVERNEMENT',
-  C: 'ENTREPRISE_PUBLIQUE',
-};
+/** Couleur de fond d'une plaque, telle qu'observée sur l'image. */
+export type PlateBackground = 'NOIR' | 'ROUGE' | 'BLEU' | 'VERT' | 'INCONNU';
 
-/** Privé : `123D45` — la lettre D est au milieu. */
-const PRIVATE_RE = /^\d{3}D\d{2}$/;
-/** Officiel : `1234A` — la lettre finale, précédée de 3 à 5 chiffres. */
+/** Privé : `243D95` ou `886D100` — D intercalée. */
+const PRIVATE_RE = /^\d{3}D\d{2,3}$/;
+/** Officiel : `1234A` — lettre finale A, B ou C, précédée de 3 à 5 chiffres. */
 const OFFICIAL_RE = /^\d{3,5}[ABC]$/;
+/** Transit : `3090TT` — suffixe TT, précédé de 3 à 5 chiffres. */
+const TRANSIT_RE = /^\d{3,5}TT$/;
 
 /** Index de la lettre `D` dans une plaque privée normalisée. */
 const PRIVATE_LETTER_INDEX = 3;
-/** Longueur d'une plaque privée normalisée (`123D45`). */
-const PRIVATE_PLATE_LENGTH = 6;
 
 /**
  * Confusions OCR classiques, appliquées uniquement aux positions qui DOIVENT
- * être des chiffres. La police FE-Schrift limite les ambiguïtés, mais l'angle,
- * le flou et les glyphes arabes voisins en produisent encore.
+ * être des chiffres.
  */
 const TO_DIGIT: Readonly<Record<string, string>> = {
   O: '0',
@@ -81,27 +80,35 @@ function digitsOnly(fragment: string): string | null {
 /**
  * Normalise un fragment de texte OCR en plaque djiboutienne valide.
  *
- * La correction des confusions est guidée par la position : un `O` à une
- * position numérique est forcément un `0`. On ne devine donc jamais à l'aveugle.
+ * `trusted` indique que le texte provient d'une région déjà identifiée comme une
+ * plaque par le détecteur. Ce drapeau change ce qu'on s'autorise à corriger :
  *
- * En revanche, on ne corrige JAMAIS un chiffre vers une lettre de catégorie :
- * `123456` deviendrait `123A56`, une plaque parfaitement valide — n'importe quel
- * numéro à 6 chiffres croisé dans la rue passerait pour une immatriculation. Un
- * faux positif déclenche une vérification hotlist sur un véhicule innocent, donc
- * on exige une vraie lettre lue à la bonne position. La police FE-Schrift est
- * précisément conçue pour lever ces ambiguïtés, et le consensus temporel
- * rattrape les lectures manquées.
+ *   - `false` (défaut) — le texte vient de l'image entière, il peut s'agir de
+ *     n'importe quoi. On exige une vraie lettre lue : corriger un chiffre vers
+ *     une lettre transformerait `163069` en `163D69`… mais aussi n'importe quel
+ *     numéro à 6 chiffres croisé dans la rue. Un faux positif déclenche une
+ *     vérification hotlist sur un véhicule innocent.
+ *   - `true` — le texte vient d'une plaque avérée. `163069` EST alors une
+ *     plaque, et rétablir le `D` masqué par la police digitale devient sûr.
+ *     Sans cela, toutes les plaques en police 7 segments seraient ignorées.
  *
- * @returns la plaque normalisée (`123D45` ou `1234A`), ou `null` si ce n'est pas
- *          une plaque.
+ * @returns la plaque normalisée (`123D45`, `1234A`, `3090TT`), ou `null`.
  */
-export function normalizeDjiboutiPlate(raw: string): string | null {
+export function normalizeDjiboutiPlate(raw: string, trusted = false): string | null {
   if (!raw) return null;
 
   const cleaned = raw.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // Officiel : la lettre finale décide. On la teste en premier car elle est sans
-  // ambiguïté — une plaque privée ne se termine jamais par A, B ou C.
+  // Transit : le suffixe TT est sans ambiguïté, on le teste en premier.
+  if (cleaned.endsWith('TT')) {
+    const digits = digitsOnly(cleaned.slice(0, -2));
+    if (digits === null) return null;
+    const candidate = `${digits}TT`;
+    return TRANSIT_RE.test(candidate) ? candidate : null;
+  }
+
+  // Officiel : la lettre finale décide. Une plaque privée ne finit jamais par
+  // A, B ou C, donc aucun conflit avec la famille ci-dessous.
   const last = cleaned.slice(-1);
   if (last === 'A' || last === 'B' || last === 'C') {
     const digits = digitsOnly(cleaned.slice(0, -1));
@@ -110,33 +117,65 @@ export function normalizeDjiboutiPlate(raw: string): string | null {
     return OFFICIAL_RE.test(candidate) ? candidate : null;
   }
 
-  // Privé : `D` intercalée, entourée de chiffres — toujours 6 caractères.
-  if (cleaned.length !== PRIVATE_PLATE_LENGTH) return null;
-  if (cleaned[PRIVATE_LETTER_INDEX] !== 'D') return null;
+  // Privé : `D` intercalée. En police digitale, elle a pu être lue comme un `0`,
+  // que l'on ne rétablit que si la région est une plaque avérée.
   const head = digitsOnly(cleaned.slice(0, PRIVATE_LETTER_INDEX));
   const tail = digitsOnly(cleaned.slice(PRIVATE_LETTER_INDEX + 1));
   if (head === null || tail === null) return null;
+
+  const letter = cleaned[PRIVATE_LETTER_INDEX];
+  const isD = letter === 'D' || (trusted && (letter === '0' || letter === 'O'));
+  if (!isD) return null;
+
   const candidate = `${head}D${tail}`;
   return PRIVATE_RE.test(candidate) ? candidate : null;
 }
 
 /** Catégorie d'une plaque normalisée, ou `null` si la plaque est invalide. */
 export function plateCategory(plate: string): PlateCategory | null {
-  if (PRIVATE_RE.test(plate)) return PLATE_CATEGORIES[plate[PRIVATE_LETTER_INDEX]] ?? null;
-  if (OFFICIAL_RE.test(plate)) return PLATE_CATEGORIES[plate.slice(-1)] ?? null;
+  if (PRIVATE_RE.test(plate)) return 'PRIVE';
+  if (TRANSIT_RE.test(plate)) return 'TRANSIT';
+  if (OFFICIAL_RE.test(plate)) {
+    const letter = plate.slice(-1);
+    return letter === 'C' ? 'ENTREPRISE_PUBLIQUE' : 'GOUVERNEMENT';
+  }
   return null;
+}
+
+/** Couleur de fond réglementaire pour une catégorie. */
+export function expectedBackground(category: PlateCategory): PlateBackground {
+  return category === 'TRANSIT' ? 'ROUGE' : 'NOIR';
+}
+
+/**
+ * Signale une plaque dont le fond ne correspond pas à sa catégorie.
+ *
+ * La couleur n'est pas décorative : chaque catégorie a son fond réglementaire
+ * (noir pour privé/gouvernement/entreprises, rouge pour le transit, bleu pour
+ * les ONG, vert pour CC/CD). Un numéro au format privé ou officiel affiché sur
+ * un fond non noir est donc une anomalie — plaque contrefaite, ou remontée sur
+ * un autre véhicule. C'est un signal à remonter à l'agent, pas à écarter
+ * silencieusement.
+ *
+ * `INCONNU` ne déclenche rien : mal éclairée ou de biais, la couleur n'est pas
+ * toujours mesurable, et l'incertitude ne doit pas devenir une accusation.
+ */
+export function isBackgroundSuspicious(plate: string, observed: PlateBackground): boolean {
+  if (observed === 'INCONNU') return false;
+  const category = plateCategory(plate);
+  if (!category) return false;
+  return observed !== expectedBackground(category);
 }
 
 /**
  * Mise en forme lisible d'une plaque normalisée.
- * `123D45` → `123 D 45` · `1234A` → `1234 A`
+ * `123D45` → `123 D 45` · `1234A` → `1234 A` · `3090TT` → `3090 TT`
  */
 export function formatDjiboutiPlate(plate: string): string {
   if (PRIVATE_RE.test(plate)) {
     return `${plate.slice(0, 3)} ${plate[PRIVATE_LETTER_INDEX]} ${plate.slice(4)}`;
   }
-  if (OFFICIAL_RE.test(plate)) {
-    return `${plate.slice(0, -1)} ${plate.slice(-1)}`;
-  }
+  if (TRANSIT_RE.test(plate)) return `${plate.slice(0, -2)} TT`;
+  if (OFFICIAL_RE.test(plate)) return `${plate.slice(0, -1)} ${plate.slice(-1)}`;
   return plate;
 }

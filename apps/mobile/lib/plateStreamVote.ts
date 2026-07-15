@@ -48,24 +48,28 @@ export interface ConfirmedPlate {
  *
  * Retourne null si ce n'est pas une plaque valide.
  */
-export function normalizePlateCandidate(raw: string): string | null {
-  return normalizeDjiboutiPlate(raw);
+export function normalizePlateCandidate(raw: string, trusted = false): string | null {
+  return normalizeDjiboutiPlate(raw, trusted);
 }
 
 /**
  * Extrait les plaques candidates depuis les blocs de texte OCR d'une frame.
  * Chaque ligne/bloc est traité séparément car une plaque tient sur une ligne.
+ *
+ * `trusted` doit être vrai lorsque le texte provient d'une région déjà
+ * identifiée comme une plaque par le détecteur : le format s'autorise alors des
+ * corrections impossibles sur l'image entière (voir `normalizeDjiboutiPlate`).
  */
-export function extractCandidates(texts: string[]): string[] {
+export function extractCandidates(texts: string[], trusted = false): string[] {
   const out = new Set<string>();
   for (const t of texts) {
     // Une plaque est lue « 123 D 45 » : c'est la ligne entière recollée qui
     // correspond, pas les tokens isolés. On tente quand même les tokens, au cas
     // où l'OCR agrège la plaque avec du texte voisin sur la même ligne.
-    const joined = normalizePlateCandidate(t);
+    const joined = normalizePlateCandidate(t, trusted);
     if (joined) out.add(joined);
     for (const token of t.split(/\s+/)) {
-      const n = normalizePlateCandidate(token);
+      const n = normalizePlateCandidate(token, trusted);
       if (n) out.add(n);
     }
   }
