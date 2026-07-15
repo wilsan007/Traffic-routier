@@ -3,12 +3,17 @@
  *
  * Trois familles reconnues, de structures différentes :
  *
- *   - Privé      `243 D 95`, `886 D 100`  — D intercalée, 3 chiffres avant,
- *                                            2 ou 3 après.
+ *   - Privé      `243 D 95`, `886 D 100`  — D intercalée.
  *   - Officiel   `1234 A`                 — 3 à 5 chiffres puis la lettre finale.
  *                                            A et B = gouvernement,
  *                                            C = entreprises publiques.
  *   - Transit    `3090 TT`                — 3 à 5 chiffres puis TT.
+ *
+ * Numérotation des plaques privées : le nombre avant le `D` court de 1 à 999 ;
+ * arrivé à 999, il repart à 1 et le nombre après le `D` s'incrémente. Les deux
+ * parties font donc 1 à 3 chiffres, sans zéros de complément (`243 D 95` et
+ * `886 D 100` coexistent). N'exiger que des préfixes à 3 chiffres écarterait
+ * 10 % du parc — ceux du début de chaque cycle (`1 D 5`, `47 D 12`).
  *
  * Les plaques sont bilingues latin/arabe et portent le même numéro dans les deux
  * graphies : lire la partie latine suffit (ML Kit n'a de toute façon pas de
@@ -34,15 +39,16 @@ export type PlateCategory = 'PRIVE' | 'GOUVERNEMENT' | 'ENTREPRISE_PUBLIQUE' | '
 /** Couleur de fond d'une plaque, telle qu'observée sur l'image. */
 export type PlateBackground = 'NOIR' | 'ROUGE' | 'BLEU' | 'VERT' | 'INCONNU';
 
-/** Privé : `243D95` ou `886D100` — D intercalée. */
-const PRIVATE_RE = /^\d{3}D\d{2,3}$/;
+/**
+ * Privé : `243D95`, `886D100`, `7D5` — D intercalée, 1 à 3 chiffres de chaque
+ * côté. Les nombres vont de 1 à 999 sans zéro de complément : un `069` est donc
+ * invalide, et cette contrainte est ce qui lève l'ambiguïté du découpage.
+ */
+const PRIVATE_RE = /^[1-9]\d{0,2}D[1-9]\d{0,2}$/;
 /** Officiel : `1234A` — lettre finale A, B ou C, précédée de 3 à 5 chiffres. */
 const OFFICIAL_RE = /^\d{3,5}[ABC]$/;
 /** Transit : `3090TT` — suffixe TT, précédé de 3 à 5 chiffres. */
 const TRANSIT_RE = /^\d{3,5}TT$/;
-
-/** Index de la lettre `D` dans une plaque privée normalisée. */
-const PRIVATE_LETTER_INDEX = 3;
 
 /**
  * Confusions OCR classiques, appliquées uniquement aux positions qui DOIVENT
@@ -117,18 +123,27 @@ export function normalizeDjiboutiPlate(raw: string, trusted = false): string | n
     return OFFICIAL_RE.test(candidate) ? candidate : null;
   }
 
-  // Privé : `D` intercalée. En police digitale, elle a pu être lue comme un `0`,
-  // que l'on ne rétablit que si la région est une plaque avérée.
-  const head = digitsOnly(cleaned.slice(0, PRIVATE_LETTER_INDEX));
-  const tail = digitsOnly(cleaned.slice(PRIVATE_LETTER_INDEX + 1));
-  if (head === null || tail === null) return null;
+  // Privé : la position du `D` varie avec la longueur du préfixe, et en police
+  // digitale il a pu être lu comme un `0`. On essaie donc chaque position
+  // plausible et on ne retient que les découpages réellement valides.
+  const found: string[] = [];
+  for (let i = 1; i < cleaned.length - 1; i++) {
+    const c = cleaned[i];
+    const isD = c === 'D' || (trusted && (c === '0' || c === 'O'));
+    if (!isD) continue;
 
-  const letter = cleaned[PRIVATE_LETTER_INDEX];
-  const isD = letter === 'D' || (trusted && (letter === '0' || letter === 'O'));
-  if (!isD) return null;
+    const head = digitsOnly(cleaned.slice(0, i));
+    const tail = digitsOnly(cleaned.slice(i + 1));
+    if (head === null || tail === null) continue;
 
-  const candidate = `${head}D${tail}`;
-  return PRIVATE_RE.test(candidate) ? candidate : null;
+    const candidate = `${head}D${tail}`;
+    if (PRIVATE_RE.test(candidate) && !found.includes(candidate)) found.push(candidate);
+  }
+
+  // Plusieurs découpages valides : on refuse plutôt que de deviner. Une plaque
+  // inventée vaut bien pire qu'une plaque manquée — le consensus temporel
+  // rattrapera la lecture suivante.
+  return found.length === 1 ? found[0] : null;
 }
 
 /** Catégorie d'une plaque normalisée, ou `null` si la plaque est invalide. */
@@ -173,7 +188,8 @@ export function isBackgroundSuspicious(plate: string, observed: PlateBackground)
  */
 export function formatDjiboutiPlate(plate: string): string {
   if (PRIVATE_RE.test(plate)) {
-    return `${plate.slice(0, 3)} ${plate[PRIVATE_LETTER_INDEX]} ${plate.slice(4)}`;
+    const i = plate.indexOf('D');
+    return `${plate.slice(0, i)} D ${plate.slice(i + 1)}`;
   }
   if (TRANSIT_RE.test(plate)) return `${plate.slice(0, -2)} TT`;
   if (OFFICIAL_RE.test(plate)) return `${plate.slice(0, -1)} ${plate.slice(-1)}`;
