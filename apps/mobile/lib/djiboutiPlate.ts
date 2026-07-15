@@ -19,9 +19,13 @@
  * graphies : lire la partie latine suffit (ML Kit n'a de toute façon pas de
  * modèle arabe).
  *
- * Hors périmètre : ONG (fond bleu), corps consulaire et diplomatique CC/CD
- * (fond vert), armée. Leurs conventions diffèrent et ne seront jamais
- * reconnues — c'est un choix, pas un oubli.
+ * Hors périmètre — c'est un choix, pas un oubli : catégorie IT, ONG (fond bleu),
+ * corps consulaire et diplomatique CC/CD (fond vert), et armée.
+ *
+ * Les plaques militaires sont de longs numéros — 10 à 12 chiffres, éventuellement
+ * préfixés `GN` ou `GR`. Elles sont écartées par les seules bornes de longueur
+ * ci-dessous : élargir ces bornes « pour mieux capter » se mettrait à les
+ * reconnaître, sans que rien ne le signale.
  *
  * ⚠️ Deux pièges vérifiés sur photos de plaques réelles :
  *
