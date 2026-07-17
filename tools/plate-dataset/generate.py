@@ -63,6 +63,15 @@ BLACK_BG = (18, 18, 18)
 RED_BG = (176, 32, 34)
 TEXT = (245, 245, 245)
 
+# Les plaques existent dans les DEUX polarités : blanc sur noir, mais aussi noir
+# sur blanc — vérifié sur photos (« 669 D 53 » et « 252 D 105 » ont un fond clair,
+# « 3044 C » et « 724 D 53 » un fond sombre). N'en générer qu'une revient à ne
+# jamais montrer au modèle la moitié du parc : il obtient alors un score parfait
+# en validation synthétique et ne lit rien du réel.
+LIGHT_BG = (238, 238, 238)
+DARK_TEXT = (24, 24, 24)
+LIGHT_BG_RATIO = 0.45
+
 # Chiffres arabes (indo-arabes) et lettre de catégorie correspondante.
 ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩"
 ARABIC_LETTER = {"D": "ج", "A": "ا", "B": "ب", "C": "ت", "TT": "تت"}
@@ -160,21 +169,40 @@ def to_arabic(n: int) -> str:
     return "".join(ARABIC_DIGITS[int(c)] for c in str(n))
 
 
-def render(plate: Plate, digital: bool, latin_font: ImageFont.FreeTypeFont,
-           arabic_font: ImageFont.FreeTypeFont | None, rng: random.Random) -> Image.Image:
-    """Rend une plaque propre, avant dégradations."""
-    w, h = 640, 160
-    img = Image.new("RGB", (w, h), plate.background)
+def render_line(text: str, font: ImageFont.FreeTypeFont, red: bool,
+                rng: random.Random) -> Image.Image:
+    """
+    Rend UNE ligne de texte sur un fond de plaque.
+
+    Le modèle lit une ligne à la fois, jamais une plaque entière. Deux raisons :
+
+      - Les plaques existent en deux dispositions — arabe à droite du latin, ou
+        empilé dessous (les deux courantes sur photos). Un CRNN comprime la
+        hauteur à un pixel pour lire de gauche à droite : sur une plaque empilée,
+        chaque colonne mêlerait un chiffre latin et un chiffre arabe superposés.
+        Illisible par construction.
+      - Une ligne isolée est un problème plus simple et mieux posé : le modèle
+        n'a plus à deviner une mise en page, c'est au pipeline de découper.
+
+    Les deux polarités sont générées : les plaques réelles sont blanc sur noir
+    OU noir sur blanc (mesuré — « 252 D 105 » a un fond clair, « 3044 C » un fond
+    sombre). N'en montrer qu'une donne un modèle parfait en validation
+    synthétique et aveugle sur la moitié du parc.
+    """
+    if red:
+        bg, fg = RED_BG, TEXT
+    elif rng.random() < LIGHT_BG_RATIO:
+        bg, fg = LIGHT_BG, DARK_TEXT
+    else:
+        bg, fg = BLACK_BG, TEXT
+
+    w, h = 640, 128
+    img = Image.new("RGB", (w, h), bg)
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle((4, 4, w - 5, h - 5), radius=10, outline=TEXT, width=3)
 
-    # Latin à gauche, arabe à droite : la disposition observée sur les plaques
-    # réelles, et l'ordre dans lequel le modèle les lira.
-    d.text((28, h // 2), plate.latin_glyphs(digital), font=latin_font, fill=TEXT, anchor="lm")
-
-    if arabic_font is not None:
-        d.text((w - 28, h // 2), plate.arabic, font=arabic_font, fill=TEXT, anchor="rm")
-
+    # Marges variables : le découpage réel ne tombera jamais au pixel près.
+    x = rng.randint(10, 60)
+    d.text((x, h // 2), text, font=font, fill=fg, anchor="lm")
     return img
 
 
@@ -256,22 +284,31 @@ def main() -> None:
         for i in range(args.count):
             plate = random_plate(rng)
             is_digital = supports_digital(plate) and rng.random() < args.digital_ratio
-            font = digital if is_digital else standard
+            red = plate.background == RED_BG
 
-            img = render(plate, is_digital, font, arabic, rng)
-            img = degrade(img, rng)
+            # Une image sur deux montre la ligne latine, l'autre la ligne arabe :
+            # le modèle doit savoir lire les deux, puisque le pipeline lui
+            # soumettra chaque ligne séparément.
+            if arabic is not None and rng.random() < 0.5:
+                text, script = plate.arabic, "arabic"
+                font = arabic
+            else:
+                text, script = plate.latin_glyphs(is_digital), "latin"
+                font = digital if is_digital else standard
+
+            img = degrade(render_line(text, font, red, rng), rng)
 
             name = f"{i:06d}.png"
             img.save(images / name)
             fh.write(json.dumps({
                 "image": f"images/{name}",
-                # Ce que le modèle doit sortir : les glyphes réellement gravés.
-                "label": plate.label(is_digital),
-                # Le numéro véritable, que la vérification croisée doit
-                # reconstruire à partir du label. Sert à évaluer le pipeline
+                # Les glyphes de CETTE ligne — ce que le modèle doit sortir.
+                "label": text,
+                "script": script,
+                # Le numéro véritable, que la vérification croisée reconstruira
+                # en confrontant les deux lignes. Sert à évaluer le pipeline
                 # complet, pas le seul modèle.
                 "plate": plate.plate,
-                "arabic": plate.arabic,
                 "font": "digital" if is_digital else "standard",
             }, ensure_ascii=False) + "\n")
 
