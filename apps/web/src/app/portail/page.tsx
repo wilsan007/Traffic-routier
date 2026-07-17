@@ -144,7 +144,7 @@ export default function PortailPage() {
             </div>
             <div>
               <label className="mb-1 block text-[13px] font-semibold text-slate-700">Plaque d'immatriculation</label>
-              <input className="input font-mono" placeholder="AB123CD" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} required />
+              <input className="input font-mono" placeholder="123 D 45" value={plate} onChange={(e) => setPlate(e.target.value.toUpperCase())} required />
             </div>
           </div>
           <button className="btn-primary" disabled={loading}>{loading ? 'Recherche…' : 'Consulter'}</button>

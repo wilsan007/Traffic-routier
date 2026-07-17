@@ -4,14 +4,23 @@ import * as argon2 from 'argon2';
 const prisma = new PrismaClient();
 
 async function main() {
+  // Format djiboutien — doit rester aligné sur apps/mobile/lib/djiboutiPlate.ts,
+  // qui filtre côté terrain :
+  //
+  //   privé    123 D 45   1 à 3 chiffres, D intercalée, 1 à 3 chiffres
+  //   officiel 1234 A     3 à 5 chiffres puis A, B ou C
+  //   transit  3090 TT    3 à 5 chiffres puis TT
+  //
+  // La regex précédente (^[A-Z0-9]{4,10}$) acceptait n'importe quoi — « A7NORD »
+  // lu sur un panneau d'autoroute passait pour une immatriculation.
   const region = await prisma.region.upsert({
-    where: { code: 'GENERIC' },
+    where: { code: 'DJ' },
     update: {},
     create: {
-      code: 'GENERIC',
-      name: 'Format générique configurable',
-      plateFormatRegex: '^[A-Z0-9]{4,10}$',
-      plateFormatHint: 'AA123AA',
+      code: 'DJ',
+      name: 'Djibouti',
+      plateFormatRegex: '^([1-9]\\d{0,2}D[1-9]\\d{0,2}|\\d{3,5}[ABC]|\\d{3,5}TT)$',
+      plateFormatHint: '123 D 45',
     },
   });
 
@@ -101,17 +110,23 @@ async function main() {
     },
   });
 
+  // Les deux véhicules portent des plaques RÉELLES, photographiées à Djibouti et
+  // conservées dans tools/plate-dataset. Elles couvrent les deux polices en
+  // service : « 252 D 105 » est gravée en police standard, « 724 D 53 » en
+  // 7 segments. Viser ces plaques permet donc d'éprouver la chaîne complète —
+  // OCR, format, consensus, correspondance véhicule, alerte hotlist — sur de
+  // vraies images plutôt que sur des numéros inventés.
   const vehicle1 = await prisma.vehicle.upsert({
-    where: { plateNumber: 'AB123CD' },
+    where: { plateNumber: '252D105' },
     update: {},
     create: {
-      plateNumber: 'AB123CD',
+      plateNumber: '252D105',
       regionId: region.id,
-      make: 'Peugeot',
-      model: '308',
-      color: 'Gris',
+      make: 'Toyota',
+      model: 'Land Cruiser',
+      color: 'Blanc',
       year: 2019,
-      vin: 'VF3AB12CD34567890',
+      vin: 'JTEBU29J2K5252105',
       insuranceStatus: InsuranceStatus.VALID,
       insuranceExpiresAt: new Date('2026-12-01'),
       technicalControlExpiresAt: new Date('2026-09-01'),
@@ -120,16 +135,16 @@ async function main() {
   });
 
   const vehicle2 = await prisma.vehicle.upsert({
-    where: { plateNumber: 'XY987ZT' },
+    where: { plateNumber: '724D53' },
     update: {},
     create: {
-      plateNumber: 'XY987ZT',
+      plateNumber: '724D53',
       regionId: region.id,
-      make: 'Renault',
-      model: 'Clio',
-      color: 'Noir',
+      make: 'Toyota',
+      model: 'Hilux',
+      color: 'Gris',
       year: 2021,
-      vin: 'VF1XY98ZT98765432',
+      vin: 'MR0FZ29G4M0724053',
       insuranceStatus: InsuranceStatus.EXPIRED,
       insuranceExpiresAt: new Date('2025-01-01'),
       stolen: true,
@@ -142,7 +157,7 @@ async function main() {
     update: {},
     create: {
       id: 'seed-hotlist-1',
-      plateNumber: 'XY987ZT',
+      plateNumber: '724D53',
       reason: HotlistReason.STOLEN_VEHICLE,
       priority: Priority.CRITICAL,
       notes: 'Véhicule signalé volé le 2026-06-20.',
