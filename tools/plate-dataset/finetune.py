@@ -97,17 +97,25 @@ def main() -> None:
     synth = charger(args.synth)
     reel = charger(args.reel)
 
-    # Découpe par plaque : toutes les lignes d'une même plaque vont du même côté.
-    plaques = sorted({r["plate"] for r in reel})
-    random.Random(args.seed).shuffle(plaques)
-    n_test = max(1, int(len(plaques) * args.part_test))
-    test_p = set(plaques[:n_test])
-    reel_train = [r for r in reel if r["plate"] not in test_p]
-    reel_test = [r for r in reel if r["plate"] in test_p]
+    # La découpe vient du corpus, elle n'est pas refaite ici.
+    #
+    # Un affinage qui tire sa propre repartition mesure ce qu'il veut : la
+    # premiere version de ce script le faisait, et 8 des 11 plaques du test de
+    # reference se sont retrouvees dans son entrainement. Le score obtenu
+    # (50,7 %) ne mesurait plus la lecture mais la memorisation. Une seule
+    # decoupe, figee dans corpus.py, pour tout le monde.
+    if not all("partie" in r for r in reel):
+        raise SystemExit(
+            "le jeu reel ne porte pas de champ `partie` : le reconstruire avec\n"
+            "  python3 tools/plate-dataset/corpus.py construire --photos <dossier>")
 
-    print(f"reel : {len(plaques)} plaques -> {len(plaques) - n_test} apprentissage, {n_test} test")
-    print(f"       {len(reel_train)} lignes apprentissage, {len(reel_test)} lignes test")
-    print(f"test  : {sorted(test_p)}")
+    reel_train = [r for r in reel if r["partie"] == "apprentissage"]
+    reel_test = [r for r in reel if r["partie"] == "test"]
+
+    print(f"decoupe du corpus : {len({r['plate'] for r in reel_train})} numeros en "
+          f"apprentissage ({len(reel_train)} lignes), "
+          f"{len({r['plate'] for r in reel_test})} en test ({len(reel_test)} lignes)")
+    print(f"test = {sorted({r['plate'] for r in reel_test})}")
 
     inconnus = {c for r in reel for c in r["label"]} - set(alphabet)
     if inconnus:
