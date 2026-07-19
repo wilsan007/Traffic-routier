@@ -565,6 +565,342 @@
    },
    "format": "carre"
   },
+  "dji_243D49": {
+   "source": "dji-july2021.jpg",
+   "plaque": "243D49",
+   "rotation": 2.5,
+   "latin": {
+    "texte": "243D49",
+    "boite": [
+     35,
+     266,
+     330,
+     80
+    ]
+   },
+   "arabe": {
+    "texte": "٤٩ج٢٤٣",
+    "boite": [
+     35,
+     348,
+     330,
+     86
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_253D37": {
+   "source": "dji-july2021.jpg",
+   "plaque": "253D37",
+   "rotation": 0.5,
+   "latin": {
+    "texte": "253D37",
+    "boite": [
+     410,
+     22,
+     355,
+     74
+    ]
+   },
+   "arabe": {
+    "texte": "٣٧ج٢٥٣",
+    "boite": [
+     410,
+     98,
+     355,
+     80
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_253D37r": {
+   "source": "dji-july2021.jpg",
+   "plaque": "253D37",
+   "rotation": 0.5,
+   "latin": {
+    "texte": "253D37",
+    "boite": [
+     135,
+     1078,
+     263,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "٣٧ج٢٥٣",
+    "boite": [
+     404,
+     1078,
+     300,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "dji_285D35": {
+   "source": "dji-july2021.jpg",
+   "plaque": "285D35",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "285D35",
+    "boite": [
+     410,
+     711,
+     355,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٣٥ج٢٨٥",
+    "boite": [
+     410,
+     796,
+     355,
+     88
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_430D40": {
+   "source": "dji-july2021.jpg",
+   "plaque": "430D40",
+   "rotation": -2.0,
+   "latin": {
+    "texte": "430D40",
+    "boite": [
+     25,
+     716,
+     325,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٤٠ج٤٣٠",
+    "boite": [
+     25,
+     798,
+     325,
+     88
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_615D43": {
+   "source": "dji-july2021.jpg",
+   "plaque": "615D43",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "615D43",
+    "boite": [
+     415,
+     483,
+     350,
+     82
+    ]
+   },
+   "arabe": {
+    "texte": "٤٣ج٦١٥",
+    "boite": [
+     415,
+     568,
+     350,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_892D27": {
+   "source": "dji-july2021.jpg",
+   "plaque": "892D27",
+   "rotation": -1.5,
+   "latin": {
+    "texte": "892D27",
+    "boite": [
+     38,
+     493,
+     322,
+     80
+    ]
+   },
+   "arabe": {
+    "texte": "٢٧ج٨٩٢",
+    "boite": [
+     38,
+     573,
+     322,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_892D27r": {
+   "source": "dji-july2021.jpg",
+   "plaque": "892D27",
+   "rotation": 1.0,
+   "latin": {
+    "texte": "892D27",
+    "boite": [
+     140,
+     938,
+     258,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "٢٧ج٨٩٢",
+    "boite": [
+     404,
+     938,
+     288,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "dji_909D34": {
+   "source": "dji-july2021.jpg",
+   "plaque": "909D34",
+   "rotation": -1.0,
+   "latin": {
+    "texte": "909D34",
+    "boite": [
+     30,
+     25,
+     350,
+     78
+    ]
+   },
+   "arabe": {
+    "texte": "٣٤ج٩٠٩",
+    "boite": [
+     30,
+     105,
+     350,
+     78
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_930D34": {
+   "source": "dji-july2021.jpg",
+   "plaque": "930D34",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "930D34",
+    "boite": [
+     415,
+     256,
+     350,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٣٤ج٩٣٠",
+    "boite": [
+     415,
+     343,
+     350,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "i3_163D69_7seg": {
+   "source": "images-3.jpeg",
+   "plaque": "163D69",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "163069",
+    "boite": [
+     25,
+     55,
+     265,
+     70
+    ]
+   },
+   "arabe": {
+    "texte": "٦٩ج١٦٣",
+    "boite": [
+     290,
+     55,
+     245,
+     70
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "i3_163D69_std": {
+   "source": "images-3.jpeg",
+   "plaque": "163D69",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "163D69",
+    "boite": [
+     25,
+     175,
+     270,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "٦٩ج١٦٣",
+    "boite": [
+     295,
+     175,
+     245,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "ic_4495TT": {
+   "source": "images copie.jpeg",
+   "plaque": "4495TT",
+   "rotation": -1.0,
+   "latin": {
+    "texte": "4495TT",
+    "boite": [
+     17,
+     24,
+     88,
+     30
+    ]
+   },
+   "arabe": {
+    "texte": "تت٤٤٩٥",
+    "boite": [
+     105,
+     24,
+     66,
+     30
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "ic_875D75": {
+   "source": "images copie.jpeg",
+   "plaque": "875D75",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "875D75",
+    "boite": [
+     47,
+     64,
+     90,
+     27
+    ]
+   },
+   "arabe": {
+    "texte": "٧٥ج٨٧٥",
+    "boite": [
+     47,
+     92,
+     80,
+     25
+    ]
+   },
+   "format": "carre"
+  },
   "images1_25D38": {
    "source": "images-1.jpeg",
    "plaque": "25D38",

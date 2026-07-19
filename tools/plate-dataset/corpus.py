@@ -117,8 +117,13 @@ def _decouper(photo, boite, rotation):
     from PIL import Image
     import numpy as np
 
+    # Marge verticale volontairement plus faible que l'horizontale : sur une
+    # plaque carrée les deux lignes se touchent presque, et 20 % de marge
+    # ramenait la ligne latine dans le recadrage arabe. Un peu de fond reste
+    # nécessaire — sans marge du tout, le modèle perd le premier caractère
+    # (mesuré : « 54D56 » sans marge, « 234D56 » avec).
     x, y, w, h = boite
-    marge_x, marge_y = int(w * 0.12), int(h * 0.20)
+    marge_x, marge_y = int(w * 0.12), int(h * 0.07)
     c = photo.crop((max(0, x - marge_x), max(0, y - marge_y),
                     min(photo.width, x + w + marge_x),
                     min(photo.height, y + h + marge_y)))
