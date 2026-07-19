@@ -132,6 +132,7 @@ def main() -> None:
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
     ctc = nn.CTCLoss(blank=0, zero_infinity=True)
     itos = alphabet
+    best = 0.0
 
     for epoch in range(1, args.epochs + 1):
         model.train()
@@ -160,11 +161,22 @@ def main() -> None:
                     off += n
                     exact += p == truth
                     seen += 1
+        accuracy = exact / seen
         print(f"epoch {epoch:3d} | perte {total / len(dl):.4f} | "
-              f"exactes {exact}/{seen} ({100 * exact / seen:.1f}%)")
+              f"exactes {exact}/{seen} ({100 * accuracy:.1f}%)", flush=True)
 
-    torch.save({"state_dict": model.state_dict(), "alphabet": alphabet}, args.out)
-    print("modèle enregistré :", args.out)
+        # Sauvegarde à chaque epoch, et non à la seule fin de la boucle.
+        # L'entraînement dure plus d'une heure : un plantage à l'epoch 28
+        # perdrait tout. On ne garde que le MEILLEUR modèle sur la validation,
+        # pas le dernier — la dernière epoch n'est pas nécessairement la
+        # meilleure, et écraser un bon modèle par un moins bon serait absurde.
+        if accuracy > best:
+            best = accuracy
+            torch.save({"state_dict": model.state_dict(), "alphabet": alphabet,
+                        "epoch": epoch, "val_accuracy": accuracy}, args.out)
+            print(f"           -> enregistre ({args.out})", flush=True)
+
+    print(f"termine — meilleure exactitude validation : {100 * best:.1f}%")
 
 
 if __name__ == "__main__":
