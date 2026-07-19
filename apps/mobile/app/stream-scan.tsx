@@ -1,16 +1,19 @@
 // Écran « Flux continu » (reconnaissance ON-DEVICE en temps réel).
 //
-// Contrairement au scan photo-par-photo, la caméra est traitée IMAGE PAR IMAGE
-// sur l'appareil : VisionCamera + un frame processor ML Kit lisent le texte de
-// chaque frame, on ne retient que ce qui a la forme d'une plaque, et une plaque
-// n'est « confirmée » que lorsqu'elle apparaît sur plusieurs frames (un vrai
-// véhicule qui passe) — voir lib/plateStreamVote.ts. Aucune requête réseau
-// n'est nécessaire : ça marche hors-ligne. Les plaques confirmées sont mises en
-// file (lib/offlineQueue) et synchronisées avec le serveur quand possible.
+// La caméra reste ouverte en continu (VisionCamera) et on capture des
+// instantanés rapides du flux (takeSnapshot = capture GPU de l'aperçu, bien
+// plus rapide qu'une vraie photo, sans obturateur) plusieurs fois par seconde.
+// Chaque instantané passe par l'OCR embarqué ML Kit (aucun réseau), on ne
+// retient que ce qui a la forme d'une plaque, et une plaque n'est « confirmée »
+// que lorsqu'elle apparaît sur plusieurs captures successives (un vrai véhicule
+// qui passe) — voir lib/plateStreamVote.ts. Marche hors-ligne ; les plaques
+// confirmées sont mises en file (offlineQueue) et synchronisées ensuite.
 //
-// Native : VisionCamera + react-native-vision-camera-text-recognition →
-// development build requis. Les modules sont chargés dynamiquement ; si absents,
-// l'écran l'indique et l'app reste utilisable (scan serveur / photo).
+// Choix technique : on n'utilise pas de frame processor natif (fragile selon
+// les versions) — juste VisionCamera pour le flux + captures, et le module OCR
+// ML Kit image (@react-native-ml-kit/text-recognition). Les deux modules sont
+// chargés dynamiquement ; absents (Expo Go), l'écran l'indique et l'app reste
+// utilisable.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -20,36 +23,48 @@ import { enqueueCapture, queueSize } from '../lib/offlineQueue';
 
 // Chargement dynamique des modules natifs (absents d'Expo Go).
 let VisionCamera: any = null;
-let TextRecognitionCamera: any = null;
+let TextRecognition: any = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   VisionCamera = require('react-native-vision-camera');
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  TextRecognitionCamera = require('react-native-vision-camera-text-recognition').Camera;
+  const mlkit = require('@react-native-ml-kit/text-recognition');
+  TextRecognition = mlkit?.default ?? mlkit;
 } catch {
   VisionCamera = null;
 }
 
-const nativeAvailable = () => VisionCamera != null && TextRecognitionCamera != null;
+const nativeAvailable = () => VisionCamera != null && TextRecognition != null;
 
-// Bloc de texte reconnu renvoyé par le plugin (on n'exploite que resultText).
-interface RecognizedBlock {
-  resultText: string;
+// Cadence des captures (ms). ~2.5 captures/seconde : compromis fluidité / charge.
+const SNAPSHOT_INTERVAL_MS = 400;
+
+interface MlkitLine {
+  text: string;
+}
+interface MlkitBlock {
+  text: string;
+  lines?: MlkitLine[];
+}
+interface MlkitResult {
+  text: string;
+  blocks?: MlkitBlock[];
 }
 
 export default function StreamScanScreen() {
   const router = useRouter();
   const available = nativeAvailable();
 
+  const cameraRef = useRef<any>(null);
   const aggregatorRef = useRef(new StreamPlateAggregator());
-  const lastProcessRef = useRef(0);
+  const scanningRef = useRef(false);
+  const activeRef = useRef(true);
   const [confirmed, setConfirmed] = useState<string[]>([]);
   const [pending, setPending] = useState(0);
   const [permissionGranted, setPermissionGranted] = useState(false);
 
   const device = available ? VisionCamera.useCameraDevice('back') : null;
 
-  // Demande la permission caméra (API VisionCamera).
   useEffect(() => {
     if (!available) return;
     (async () => {
@@ -60,32 +75,50 @@ export default function StreamScanScreen() {
 
   useEffect(() => {
     queueSize().then(setPending);
-    const id = setInterval(() => aggregatorRef.current.prune(), 5000);
-    return () => clearInterval(id);
   }, []);
 
-  // Callback appelé par le plugin à chaque frame analysée. On throttle le
-  // traitement JS (~150 ms) pour ne pas saturer le thread, et le consensus
-  // temporel fait le reste.
-  const onText = useCallback((data: string | RecognizedBlock[]) => {
-    const now = Date.now();
-    if (now - lastProcessRef.current < 150) return;
-    lastProcessRef.current = now;
+  // Analyse un instantané : OCR ML Kit -> candidats plaque -> consensus.
+  const analyzeSnapshot = useCallback(async () => {
+    if (scanningRef.current || !cameraRef.current) return;
+    scanningRef.current = true;
+    try {
+      const snapshot = await cameraRef.current.takeSnapshot({ quality: 85 });
+      const uri = snapshot?.path ? `file://${snapshot.path}` : null;
+      if (!uri) return;
 
-    const blocks = Array.isArray(data) ? data : [];
-    const lines = blocks
-      .map((b) => b?.resultText ?? '')
-      .flatMap((t) => t.split('\n'));
-    const candidate = bestPlateCandidate(lines);
-    if (!candidate) return;
+      const result: MlkitResult = await TextRecognition.recognize(uri);
+      const lines = (result.blocks ?? [])
+        .flatMap((b) => (b.lines?.length ? b.lines.map((l) => l.text) : [b.text]))
+        .concat((result.text ?? '').split('\n'));
 
-    const plate = aggregatorRef.current.observe([candidate], now);
-    if (plate) {
-      setConfirmed((prev) => (prev.includes(plate) ? prev : [plate, ...prev].slice(0, 20)));
-      // File hors-ligne : synchronisée plus tard vers le serveur.
-      enqueueCapture({ plate, confidence: 0.8, imageUri: '' }).then(setPending);
+      const candidate = bestPlateCandidate(lines);
+      if (!candidate) return;
+
+      const plate = aggregatorRef.current.observe([candidate]);
+      if (plate) {
+        setConfirmed((prev) => (prev.includes(plate) ? prev : [plate, ...prev].slice(0, 20)));
+        enqueueCapture({ plate, confidence: 0.8, imageUri: uri }).then(setPending);
+      }
+    } catch {
+      // capture/OCR ratée sur cette frame : on ignore, la suivante réessaiera
+    } finally {
+      scanningRef.current = false;
     }
   }, []);
+
+  // Boucle de capture tant que l'écran est actif et la caméra prête.
+  useEffect(() => {
+    if (!available || !permissionGranted || !device) return;
+    activeRef.current = true;
+    const id = setInterval(() => {
+      if (activeRef.current) analyzeSnapshot();
+      aggregatorRef.current.prune();
+    }, SNAPSHOT_INTERVAL_MS);
+    return () => {
+      activeRef.current = false;
+      clearInterval(id);
+    };
+  }, [available, permissionGranted, device, analyzeSnapshot]);
 
   if (!available) {
     return (
@@ -111,17 +144,10 @@ export default function StreamScanScreen() {
     );
   }
 
-  const Cam = TextRecognitionCamera;
+  const Cam = VisionCamera.Camera;
   return (
     <View style={styles.container}>
-      <Cam
-        style={styles.camera}
-        device={device}
-        isActive={true}
-        mode="recognize"
-        options={{ language: 'latin' }}
-        callback={onText}
-      />
+      <Cam ref={cameraRef} style={styles.camera} device={device} isActive={true} photo={true} />
       <View style={styles.hud}>
         <Text style={styles.hudTitle}>🎥 Flux continu · {pending} en attente de sync</Text>
       </View>
