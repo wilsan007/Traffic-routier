@@ -11,6 +11,7 @@ import {
   extractCandidates,
   DEFAULT_PLATE_VOTE_CONFIG,
 } from '../lib/plateStreamVote';
+import { addScan, updateScan } from '../lib/scanHistory';
 
 // Le plugin n'exporte pas publiquement son type `Text` ; on modélise le minimum
 // consommé (chaque bloc reconnu fournit `resultText`).
@@ -70,8 +71,22 @@ export default function StreamScanScreen() {
     if (inFlightRef.current.has(plate)) return;
     inFlightRef.current.add(plate);
     setConfirmedCount((c) => c + 1);
-    const pending: FeedItem = { plate, at: Date.now(), status: 'checking' };
+    const at = Date.now();
+    const pending: FeedItem = { plate, at, status: 'checking' };
     setFeed((f) => [pending, ...f].slice(0, 30));
+
+    // Journal persistant AVANT la vérification serveur : le fil ci-dessus est
+    // éphémère, et sur le terrain le réseau n'est pas garanti. L'entrée naît
+    // en `offline` et sera promue par la réponse serveur — ainsi une coupure
+    // au mauvais moment laisse une trace re-vérifiable, jamais un trou.
+    const saved = await addScan({
+      plate,
+      at,
+      status: 'offline',
+      latitude: coordsRef.current?.latitude,
+      longitude: coordsRef.current?.longitude,
+    }).catch(() => null);
+
     try {
       const res = await api.post<ScanPlateResult>('/captures/scan-plate', {
         plate,
@@ -82,6 +97,7 @@ export default function StreamScanScreen() {
         const detail = res.hotlistAlerts.map((a) => a.hotlistEntry.reason).join(', ');
         const priority = res.hotlistAlerts[0]?.hotlistEntry.priority ?? '';
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'alert', detail } : it)));
+        if (saved) updateScan(saved.id, { status: 'alert', detail });
         Notifications.scheduleNotificationAsync({
           content: {
             title: `🚨 ${plate} — Liste de surveillance ${priority}`,
@@ -94,10 +110,14 @@ export default function StreamScanScreen() {
         const v = res.vehicleMatch;
         const detail = `${v.make ?? ''} ${v.model ?? ''}`.trim() + (v.stolen ? ' — ⚠️ VOLÉ' : '');
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: v.stolen ? 'alert' : 'known', detail } : it)));
+        if (saved) updateScan(saved.id, { status: v.stolen ? 'alert' : 'known', detail });
       } else {
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'clear' } : it)));
+        if (saved) updateScan(saved.id, { status: 'clear' });
       }
     } catch {
+      // L'entrée du journal reste en `offline` : re-vérifiable depuis
+      // l'onglet Historique dès que le réseau revient.
       setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'clear', detail: 'hors ligne' } : it)));
     } finally {
       // Laisse le cooldown du voteur gérer la re-vérification.
