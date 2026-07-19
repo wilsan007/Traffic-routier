@@ -58,6 +58,16 @@ def parse_arabic(arabic: str) -> str | None:
         digits = "".join(AR_TO_LATIN[c] for c in arabic if c in AR_TO_LATIN)
         return f"{digits}TT" if digits else None
 
+    # Plusieurs lettres DIFFÉRENTES : on refuse au lieu de retenir la première.
+    #
+    # Observé sur une vraie plaque : « ٥٦ج٢٣٤ » lu « ب٥٦ج٢٣٤ », un ب halluciné
+    # en tête. Prendre letters[0] donnait « 56234B » — un format officiel
+    # parfaitement valide, donc indétectable en aval. Si le latin avait été mal
+    # lu de façon concordante, la vérification croisée aurait validé une plaque
+    # inexistante. C'est précisément ce contre quoi elle existe.
+    if len({AR_LETTER_TO_LATIN[c] for c in letters}) > 1:
+        return None
+
     letter = AR_LETTER_TO_LATIN[letters[0]]
     i = arabic.index(letters[0])
     left = "".join(AR_TO_LATIN.get(c, "") for c in arabic[:i])
@@ -77,6 +87,23 @@ def reconcile(raw: str) -> Reading:
 
     if not latin:
         return Reading(None, False, "aucun latin lu")
+    if not arabic:
+        return Reading(None, False, "aucun arabe lu")
+
+    # Les deux graphies portent le même numéro, donc EXACTEMENT autant de
+    # caractères l'une que l'autre. Vérifié : sur 51 043 plaques générées
+    # l'écart est toujours nul, et il l'est sur les six plaques réelles
+    # mesurées (« 234D56 »/« ٥٦ج٢٣٤ », « 3044C »/« ت٣٠٤٤ »…).
+    #
+    # Ce test attrape ce que le tri par alphabet ne peut pas voir : un glyphe
+    # halluciné qui tombe dans la BONNE écriture. Observé sur une vraie plaque,
+    # « ٥٦ج٢٣٤ » lu « ب٥٦ج٢٣٤ » — le `ب` est un caractère arabe parfaitement
+    # légitime, rien ne le distingue d'un vrai, sauf qu'il porte le total à 7
+    # contre 6 côté latin.
+    if len(latin) != len(arabic):
+        return Reading(None, False,
+                       f"compte inégal : {len(latin)} latin vs {len(arabic)} arabe")
+
     if from_arabic is None:
         return Reading(None, False, "arabe illisible ou sans lettre")
 
