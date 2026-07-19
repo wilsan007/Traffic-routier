@@ -10,7 +10,8 @@
   "618-2_0": "latin dit 164, arabe semble dire 194 : desaccord non tranche",
   "638-2_0": "trop floue (48088 ?)",
   "641-2_0": "hesitation (3160189, decoupage incertain)",
-  "643-3_0": "arabe seul, pas de latin dans le recadrage"
+  "643-3_0": "arabe seul, pas de latin dans le recadrage",
+  "3625_0": "arabe illisible avec certitude (ordre et lettre indecis sur le recadrage) : plaque 2887C ecartee plutot qu'annotee au juge"
  },
  "plaques": {
   "3614_0": {
@@ -99,36 +100,12 @@
     ]
    },
    "arabe": {
-    "texte": "ت٣٧٢٥",
+    "texte": "٣٧٢٥ت",
     "boite": [
      484,
      358,
      178,
      62
-    ]
-   },
-   "format": "rectangulaire"
-  },
-  "3625_0": {
-   "source": "WhatsApp Image 2026-07-19 at 14.36.25.jpeg",
-   "plaque": "2887C",
-   "rotation": 0,
-   "latin": {
-    "texte": "2887C",
-    "boite": [
-     556,
-     371,
-     89,
-     48
-    ]
-   },
-   "arabe": {
-    "texte": "ت٢٨٨٧",
-    "boite": [
-     645,
-     371,
-     70,
-     48
     ]
    },
    "format": "rectangulaire"
@@ -819,7 +796,7 @@
     ]
    },
    "arabe": {
-    "texte": "٦٩ج١٦٣",
+    "texte": "١٦٣ج٦٩",
     "boite": [
      290,
      55,
@@ -843,7 +820,7 @@
     ]
    },
    "arabe": {
-    "texte": "٦٩ج١٦٣",
+    "texte": "١٦٣ج٦٩",
     "boite": [
      295,
      175,
