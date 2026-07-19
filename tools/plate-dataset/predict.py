@@ -60,10 +60,13 @@ def read(model: CRNN, alphabet: list[str], path: Path, script: str | None = None
     if script is None:
         return decode(logits, alphabet)[0]
 
-    viable, complete = (
-        (constrained.viable_latin, constrained.complete_latin) if script == "latin"
-        else (constrained.viable_arabic, constrained.complete_arabic)
-    )
+    viable, complete = {
+        "latin": (constrained.viable_latin, constrained.complete_latin),
+        "arabic": (constrained.viable_arabic, constrained.complete_arabic),
+        # Ligne complète d'une plaque rectangulaire : latin puis arabe en une
+        # passe — la frontière est dans le texte, pas dans l'image.
+        "full": (constrained.viable_full, constrained.complete_full),
+    }[script]
     logp = logits.log_softmax(-1)[0].cpu().numpy()
     return constrained.beam_search(logp, alphabet, viable, complete)
 
@@ -84,8 +87,16 @@ def main() -> None:
     plates: dict[str, dict[str, str]] = {}
     for path in args.images:
         name, _, script = path.stem.rpartition("_")
+        if script == "full":
+            # Plaque rectangulaire lue d'un seul tenant : les deux graphies
+            # sont dans la même lecture, reconcile les sépare lui-même.
+            raw = read(model, alphabet, path, None if args.glouton else "full")
+            r = reconcile(raw)
+            verdict = r.plate if r.plate else "REJET"
+            print(f"{name or path.stem:22} ligne={raw!r:26} -> {verdict:10} ({r.reason})")
+            continue
         if script not in ("latin", "arabic"):
-            print(f"{path.name}: ignore (attendu <plaque>_latin.png ou <plaque>_arabic.png)")
+            print(f"{path.name}: ignore (attendu <plaque>_latin.png, _arabic.png ou _full.png)")
             continue
         plates.setdefault(name or path.stem, {})[script] = read(
             model, alphabet, path, None if args.glouton else script)

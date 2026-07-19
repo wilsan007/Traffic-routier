@@ -134,39 +134,85 @@ def random_plate(rng: random.Random) -> Plate:
     """
     Tire une plaque valide, au hasard parmi les trois familles.
 
-    L'arabe est construit dans son ORDRE VISUEL, c'est-à-dire inversé par rapport
-    au latin — le rendu droite-à-gauche fait apparaître le suffixe en premier.
-    Vérifié sur trois plaques réelles indépendantes :
+    L'arabe est construit dans son ORDRE VISUEL — celui que le modèle lira de
+    gauche à droite (PIL ne réordonne pas le bidirectionnel). Mais cet ordre
+    VARIE selon le fabricant, et les deux existent sur photos réelles :
 
+        ordre INVERSÉ (le plus courant — six plaques vérifiées) :
         « 252 D 105 »  ->  ١٠٥ ج ٢٥٢     (suffixe, lettre, préfixe)
-        « 724 D 53 »   ->  ٥٣ ج ٧٢٤
         « 3044 C »     ->  ت ٣٠٤٤        (lettre, puis nombre)
 
-    PIL ne réordonne pas le bidirectionnel : on lui donne donc directement
-    l'ordre visuel, qui est aussi celui que le modèle lira de gauche à droite.
+        ordre DIRECT, identique au latin (découvert quand le modèle a lu les
+        pixels « dans le mauvais ordre »… et que les pixels lui donnaient
+        raison contre l'annotation) :
+        « 163 D 69 »   ->  ١٦٣ ج ٦٩      (préfixe, lettre, suffixe)
+        « 3725 C »     ->  ٣٧٢٥ ت        (nombre, puis lettre)
+
+    Le jeu doit montrer les deux, sinon le modèle apprendrait un ordre unique
+    et sortirait des lectures « impossibles » sur l'autre moitié du parc.
+    C'est la concordance avec le latin qui tranche à la lecture.
     """
     kind = rng.choices(["prive", "officiel", "transit"], weights=[70, 20, 10])[0]
+    direct = rng.random() < 0.35
 
     if kind == "prive":
         head, tail = rng.randint(1, 999), rng.randint(1, 999)
+        gauche, droite = (head, tail) if direct else (tail, head)
         return Plate(f"{head}D{tail}",
-                     to_arabic(tail) + ARABIC_LETTER["D"] + to_arabic(head),
+                     to_arabic(gauche) + ARABIC_LETTER["D"] + to_arabic(droite),
                      BLACK_BG)
 
     number = rng.randint(100, 99999)
     if kind == "officiel":
         letter = rng.choice("ABC")
-        return Plate(f"{number}{letter}",
-                     ARABIC_LETTER[letter] + to_arabic(number),
-                     BLACK_BG)
+        arabe = (to_arabic(number) + ARABIC_LETTER[letter] if direct
+                 else ARABIC_LETTER[letter] + to_arabic(number))
+        return Plate(f"{number}{letter}", arabe, BLACK_BG)
 
-    return Plate(f"{number}TT",
-                 ARABIC_LETTER["TT"] + to_arabic(number),
-                 RED_BG)
+    arabe = (to_arabic(number) + ARABIC_LETTER["TT"] if direct
+             else ARABIC_LETTER["TT"] + to_arabic(number))
+    return Plate(f"{number}TT", arabe, RED_BG)
 
 
 def to_arabic(n: int) -> str:
     return "".join(ARABIC_DIGITS[int(c)] for c in str(n))
+
+
+def _fond(red: bool, rng: random.Random) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+    """Tire un couple (fond, encre) parmi les polarités réellement observées."""
+    if red:
+        return RED_BG, TEXT
+    if rng.random() < LIGHT_BG_RATIO:
+        return LIGHT_BG, DARK_TEXT
+    return BLACK_BG, TEXT
+
+
+def _text_mask(text: str, font: ImageFont.FreeTypeFont,
+               rng: random.Random) -> Image.Image | None:
+    """
+    Masque d'encre du texte, recadré au pixel près, à chasse variable.
+
+    Les caractères sont posés un par un, avec une avance réduite ou élargie,
+    au lieu d'être rendus d'un bloc. Mesuré sur le modèle entraîné sans cela :
+    il lit « 5100103 » parfaitement à chasse normale, encore à 80 %, puis
+    s'effondre — « 50003 » à 70 %, « 5000 » à 60 %. Or DSEG espace largement
+    ses glyphes alors que les vraies plaques 7 segments sont gravées quasi
+    jointives (vérifié sur la plaque « 510 D 103 » d'un Range Rover).
+    """
+    tracking = rng.uniform(0.55, 1.10)
+    advances = [font.getlength(c) for c in text]
+    if sum(advances) <= 0:
+        return None
+
+    pad = int(font.size)
+    canvas = Image.new("L", (int(sum(advances) * tracking) + 2 * pad, 4 * pad), 0)
+    md = ImageDraw.Draw(canvas)
+    x = float(pad)
+    for ch, adv in zip(text, advances):
+        md.text((x, canvas.height // 2), ch, font=font, fill=255, anchor="lm")
+        x += adv * tracking
+    bbox = canvas.getbbox()
+    return canvas.crop(bbox) if bbox else None
 
 
 def render_line(text: str, font: ImageFont.FreeTypeFont, red: bool,
@@ -189,82 +235,94 @@ def render_line(text: str, font: ImageFont.FreeTypeFont, red: bool,
     sombre). N'en montrer qu'une donne un modèle parfait en validation
     synthétique et aveugle sur la moitié du parc.
     """
-    if red:
-        bg, fg = RED_BG, TEXT
-    elif rng.random() < LIGHT_BG_RATIO:
-        bg, fg = LIGHT_BG, DARK_TEXT
-    else:
-        bg, fg = BLACK_BG, TEXT
-
+    bg, fg = _fond(red, rng)
     w, h = 640, 128
     img = Image.new("RGB", (w, h), bg)
-    d = ImageDraw.Draw(img)
 
-    # La taille de police est CALCULÉE pour que le texte remplisse le cadre, et
-    # non fixée à l'avance. Mesuré : à taille fixe, le texte ne couvrait que
-    # ~55 % de la largeur et ~45 % de la hauteur, collé à gauche, le reste vide
-    # — alors qu'un recadrage réel est rempli à ~100 % × ~90 %. Le modèle
-    # atteignait 99,9 % en validation et lisait 0/4 vraies plaques : il avait
-    # appris « petits glyphes en haut à gauche », pas à lire.
-    #
-    # Ajuster à la boîte réelle du texte règle du même coup la disparité entre
-    # polices : Baghdad rend des glyphes bien plus petits qu'Arial à taille
-    # nominale égale, l'arabe se retrouvait deux fois moins haut que le latin.
-    # En partant de la boîte mesurée, la police utilisée n'importe plus.
-    # Plage centrée sur ce que valent les vrais recadrages (~77 % dans les deux
-    # axes, mesuré), et assez large pour couvrir un découpage plus lâche comme
-    # plus serré : c'est le pipeline qui recadre, et il ne sera jamais régulier.
+    # La taille est CALCULÉE pour que le texte remplisse le cadre : à taille de
+    # police fixe, le texte ne couvrait que ~55 % de la largeur, collé à gauche,
+    # et le modèle apprenait « petits glyphes en haut à gauche », pas à lire.
+    # Les DEUX axes sont mis à l'échelle indépendamment via le masque recadré
+    # sur l'encre : un facteur commun laissait l'arabe à 71 % de largeur pour
+    # 84 % de hauteur (la hampe du `ج` rend la hauteur toujours contraignante),
+    # soit des glyphes plus hauts et étroits que le réel (~77/77). Le masque
+    # rend aussi le résultat indépendant des métriques de la police.
     target_w = int(w * rng.uniform(0.58, 0.88))
     target_h = int(h * rng.uniform(0.52, 0.86))
 
-    # Chasse variable : les caractères sont posés un par un, avec une avance
-    # réduite ou élargie, au lieu d'être rendus d'un bloc.
-    #
-    # Mesuré sur le modèle entraîné sans cela : il lit « 5100103 » parfaitement
-    # à chasse normale, encore à 80 %, puis s'effondre — « 50003 » à 70 %,
-    # « 5000 » à 60 %. Or DSEG espace largement ses glyphes alors que les vraies
-    # plaques 7 segments sont gravées quasi jointives (vérifié sur la plaque
-    # « 510 D 103 » d'un Range Rover). Le modèle n'avait donc jamais vu de
-    # caractères serrés, et fusionnait ceux du réel.
-    tracking = rng.uniform(0.55, 1.10)
-    advances = [font.getlength(c) for c in text]
+    mask = _text_mask(text, font, rng)
+    if mask is None:
+        ImageDraw.Draw(img).text((10, h // 2), text, font=font, fill=fg, anchor="lm")
+        return img
+    mask = mask.resize((max(1, target_w), max(1, target_h)), Image.LANCZOS)
 
-    if sum(advances) > 0:
-        pad = int(font.size)
-        canvas_w = int(sum(advances) * tracking) + 2 * pad
-        canvas_h = 4 * pad
-        mask = Image.new("L", (canvas_w, canvas_h), 0)
-        md = ImageDraw.Draw(mask)
-        x = float(pad)
-        for ch, adv in zip(text, advances):
-            md.text((x, canvas_h // 2), ch, font=font, fill=255, anchor="lm")
-            x += adv * tracking
-        # Le masque est recadré sur l'encre puis redimensionné sur les DEUX axes
-        # indépendamment. Un facteur d'échelle commun couplerait largeur et
-        # hauteur : la dimension contraignante fixerait l'autre, qui
-        # sous-remplirait. Mesuré sur 3 000 images, l'arabe remplissait alors
-        # 71 % de la largeur pour 84 % de la hauteur, contre 85/84 pour le latin
-        # — la hampe descendante du `ج` rend la hauteur toujours contraignante.
-        # Les glyphes arabes sortaient plus hauts et plus étroits que sur les
-        # vraies plaques (~77/77), et le modèle échouait sur l'arabe réel alors
-        # qu'il lisait le latin.
-        #
-        # Passer par un masque rend en outre le résultat indépendant de la
-        # police : ce qui est ajusté est l'encre effectivement dessinée, pas une
-        # métrique typographique qui varie d'une fonte à l'autre.
-        bbox = mask.getbbox()
-        if bbox is None:
-            d.text((10, h // 2), text, font=font, fill=fg, anchor="lm")
-            return img
-        mask = mask.crop(bbox).resize((max(1, target_w), max(1, target_h)), Image.LANCZOS)
+    # Position libre dans le cadre : le découpage réel ne tombera jamais au
+    # pixel près.
+    x = rng.randint(0, max(0, w - target_w))
+    y = rng.randint(0, max(0, h - target_h))
+    img.paste(Image.new("RGB", mask.size, fg), (x, y), mask)
+    return img
 
-        # Position libre dans le cadre : le découpage réel ne tombera jamais au
-        # pixel près.
-        x = rng.randint(0, max(0, w - target_w))
-        y = rng.randint(0, max(0, h - target_h))
-        img.paste(Image.new("RGB", mask.size, fg), (x, y), mask)
-    else:
-        d.text((10, h // 2), text, font=font, fill=fg, anchor="lm")
+
+def render_full_line(latin_text: str, latin_font: ImageFont.FreeTypeFont,
+                     arabic_text: str, arabic_font: ImageFont.FreeTypeFont,
+                     red: bool, rng: random.Random) -> Image.Image:
+    """
+    Rend une plaque RECTANGULAIRE entière : latin puis arabe, côte à côte.
+
+    C'est le format qui a fait échouer quatre méthodes de découpe successives —
+    ratio fixe, plus grand blanc vertical, comptage de caractères, comptage
+    filtré par largeur : la frontière entre les deux graphies n'est marquée par
+    aucun indice d'image fiable (glyphes jointifs, diacritiques détachés,
+    cadres emboutis).
+
+    La réponse n'est pas une cinquième heuristique : le modèle apprend à lire
+    la ligne ENTIÈRE, et la séparation se fait dans le TEXTE, où elle est
+    triviale — les deux alphabets sont disjoints (voir
+    crosscheck.split_scripts). La frontière d'image disparaît du problème.
+
+    Les plaques carrées, elles, restent lues ligne à ligne : leur coupe
+    horizontale est fiable (mesuré : 8,3 % d'erreur caractère), et un CRNN qui
+    comprime la hauteur ne peut de toute façon pas lire deux lignes superposées
+    en une passe.
+    """
+    bg, fg = _fond(red, rng)
+    w, h = 640, 128
+    img = Image.new("RGB", (w, h), bg)
+
+    ml = _text_mask(latin_text, latin_font, rng)
+    ma = _text_mask(arabic_text, arabic_font, rng)
+    if ml is None or ma is None:
+        return img
+
+    target_h = int(h * rng.uniform(0.52, 0.86))
+    total_w = int(w * rng.uniform(0.80, 0.94))
+    gap = int(w * rng.uniform(0.02, 0.06))
+
+    # Largeurs au prorata de l'encre de chaque graphie, à hauteur commune :
+    # c'est la géométrie des plaques réelles, où les deux blocs partagent la
+    # même hauteur mais jamais la même largeur.
+    wl = ml.width * (target_h / ml.height) * rng.uniform(0.85, 1.10)
+    wa = ma.width * (target_h / ma.height) * rng.uniform(0.85, 1.10)
+    s = min(1.0, (total_w - gap) / max(1.0, wl + wa))
+    wl, wa = max(1, int(wl * s)), max(1, int(wa * s))
+
+    x = rng.randint(0, max(0, w - (wl + gap + wa)))
+    y = rng.randint(0, max(0, h - target_h))
+    img.paste(Image.new("RGB", (wl, target_h), fg), (x, y),
+              ml.resize((wl, target_h), Image.LANCZOS))
+    img.paste(Image.new("RGB", (wa, target_h), fg), (x + wl + gap, y),
+              ma.resize((wa, target_h), Image.LANCZOS))
+
+    # Une partie des plaques réelles porte un séparateur vertical gravé entre
+    # les deux graphies (observé sur « 892 D 27 » et « 253 D 37 »). Le modèle
+    # doit apprendre à ne PAS le lire — le contexte le distingue d'un `1` ou
+    # d'un `١` : il est isolé entre les deux blocs, jamais dans une séquence.
+    if rng.random() < 0.3:
+        bx = x + wl + gap // 2
+        ImageDraw.Draw(img).rectangle(
+            [bx - 1, y + int(target_h * 0.1), bx + 1, y + int(target_h * 0.9)],
+            fill=fg)
     return img
 
 
@@ -336,6 +394,8 @@ def main() -> None:
     ap.add_argument("--arabic-font", type=Path, default=None, nargs="+")
     ap.add_argument("--digital-ratio", type=float, default=0.5,
                     help="Part de plaques en police 7 segments (part croissante du parc).")
+    ap.add_argument("--full-ratio", type=float, default=0.34,
+                    help="Part de lignes complètes latin+arabe (format rectangulaire).")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -376,17 +436,28 @@ def main() -> None:
             is_digital = supports_digital(plate) and rng.random() < args.digital_ratio
             red = plate.background == RED_BG
 
-            # Une image sur deux montre la ligne latine, l'autre la ligne arabe :
-            # le modèle doit savoir lire les deux, puisque le pipeline lui
-            # soumettra chaque ligne séparément.
-            if arabic is not None and rng.random() < 0.5:
+            # Trois types d'échantillons, calqués sur ce que le pipeline
+            # soumettra réellement au modèle :
+            #   - ligne latine seule et ligne arabe seule — les deux moitiés
+            #     d'une plaque CARRÉE, découpée horizontalement (fiable) ;
+            #   - ligne COMPLÈTE latin+arabe — une plaque RECTANGULAIRE
+            #     entière, qui se lit en une passe précisément parce que sa
+            #     frontière interne est introuvable dans l'image.
+            latin_font = rng.choice(digital if is_digital else standard)
+            tirage = rng.random() if arabic is not None else 1.0
+            if tirage < args.full_ratio:
+                latin_glyphs = plate.latin_glyphs(is_digital)
+                text, script = latin_glyphs + plate.arabic, "full"
+                rendu = render_full_line(latin_glyphs, latin_font,
+                                         plate.arabic, rng.choice(arabic), red, rng)
+            elif tirage < args.full_ratio + (1 - args.full_ratio) / 2:
                 text, script = plate.arabic, "arabic"
-                font = rng.choice(arabic)
+                rendu = render_line(text, rng.choice(arabic), red, rng)
             else:
                 text, script = plate.latin_glyphs(is_digital), "latin"
-                font = rng.choice(digital if is_digital else standard)
+                rendu = render_line(text, latin_font, red, rng)
 
-            img = degrade(render_line(text, font, red, rng), rng)
+            img = degrade(rendu, rng)
 
             name = f"{i:06d}.png"
             img.save(images / name)

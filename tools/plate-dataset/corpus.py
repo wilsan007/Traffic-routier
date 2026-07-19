@@ -62,9 +62,40 @@ def decoupe_apprentissage_test(plaques: dict) -> tuple[set[str], set[str]]:
 
 
 def lignes(plaques: dict) -> list[dict]:
-    """Aplatit le corpus en lignes individuelles, l'unité que lit le modèle."""
+    """
+    Aplatit le corpus en lignes individuelles, l'unité que lit le modèle.
+
+    Le découpage dépend du FORMAT physique de la plaque :
+
+      - carrée : deux lignes superposées, découpées séparément — la coupe
+        horizontale entre elles est fiable (mesuré : 8,3 % d'erreur caractère
+        sur ces découpes) ;
+      - rectangulaire : UNE ligne complète, latin et arabe ensemble. Quatre
+        méthodes de découpe interne ont échoué — la frontière entre graphies
+        n'existe pas de façon fiable dans l'image. Elle existe dans le texte,
+        où les alphabets disjoints la rendent triviale : c'est donc au modèle
+        de lire la ligne entière, et à `reconcile` de séparer. La boîte est
+        l'union des deux blocs, l'étiquette leur concaténation — la frontière
+        interne (jadis posée arbitrairement à 56 % de la largeur) ne fait plus
+        partie des données.
+    """
     out = []
     for tag, v in plaques.items():
+        if v.get("format") == "rectangulaire" and v.get("arabe"):
+            lx, ly, lw, lh = v["latin"]["boite"]
+            ax, ay, aw, ah = v["arabe"]["boite"]
+            x0, y0 = min(lx, ax), min(ly, ay)
+            x1, y1 = max(lx + lw, ax + aw), max(ly + lh, ay + ah)
+            out.append({
+                "tag": tag,
+                "source": v["source"],
+                "plaque": v["plaque"],
+                "rotation": v.get("rotation", 0),
+                "script": "full",
+                "label": v["latin"]["texte"] + v["arabe"]["texte"],
+                "boite": [x0, y0, x1 - x0, y1 - y0],
+            })
+            continue
         for script in ("latin", "arabe"):
             bloc = v.get(script)
             if not bloc:

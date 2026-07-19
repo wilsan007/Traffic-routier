@@ -106,10 +106,17 @@ def complete_latin(s: str) -> bool:
 
 
 def viable_arabic(s: str) -> bool:
+    """
+    L'ordre des groupes VARIE selon le fabricant (vérifié sur photos) : la
+    lettre de catégorie peut précéder le nombre (« ت٣٠٤٤ », ordre inversé, le
+    plus courant) ou le suivre (« ٣٧٢٥ت », ordre direct — « 3725 C » réelle).
+    La grammaire accepte donc les deux ; c'est la concordance avec le latin qui
+    tranchera (voir crosscheck.parse_arabic).
+    """
     if s == "":
         return True
 
-    # officiel et transit commencent par la lettre de catégorie.
+    # Lettre de catégorie en TÊTE (ordre inversé) : ا/ب/ت puis chiffres.
     if s[0] in "اب":
         rest = s[1:]
         return all(c in AR_DIGITS for c in rest) and len(rest) <= 5
@@ -122,7 +129,7 @@ def viable_arabic(s: str) -> bool:
         rest = s[1:]
         return all(c in AR_DIGITS for c in rest) and len(rest) <= 5
 
-    # privé : chiffres, ج, chiffres — en ordre visuel inversé.
+    # privé : chiffres, ج, chiffres — même structure dans les deux ordres.
     if "ج" in s:
         i = s.index("ج")
         head, tail = s[:i], s[i + 1:]
@@ -134,7 +141,18 @@ def viable_arabic(s: str) -> bool:
         return (tail[0] in AR_NONZERO and all(c in AR_DIGITS for c in tail)
                 and len(tail) <= 3)
 
-    return (all(c in AR_DIGITS for c in s) and s[0] in AR_NONZERO and len(s) <= 3)
+    # Lettre de catégorie en QUEUE (ordre direct) : chiffres puis ا/ب/ت/تت.
+    digits, rest = _split_digits(s, AR_DIGITS)
+    if digits and len(digits) <= 5:
+        if rest == "":
+            # encore extensible : vers officiel/transit direct, ou vers un
+            # privé si le début autorise un ج (préfixe 1-3 chiffres non nuls)
+            return True
+        if rest in ("ا", "ب", "ت") and 3 <= len(digits) <= 5:
+            return True
+        if rest == "تت" and 3 <= len(digits) <= 5:
+            return True
+    return False
 
 
 def complete_arabic(s: str) -> bool:
@@ -144,12 +162,14 @@ def complete_arabic(s: str) -> bool:
     # les plaques les plus basses du parc.
     if len(s) < 3:
         return False
+    # lettre en tête (ordre inversé)
     if s[0] == "ت" and len(s) > 1 and s[1] == "ت":
         rest = s[2:]
         return 3 <= len(rest) <= 5 and all(c in AR_DIGITS for c in rest)
     if s[0] in "ابت":
         rest = s[1:]
         return 3 <= len(rest) <= 5 and all(c in AR_DIGITS for c in rest)
+    # privé
     if "ج" in s:
         i = s.index("ج")
         head, tail = s[:i], s[i + 1:]
@@ -157,7 +177,55 @@ def complete_arabic(s: str) -> bool:
                 and all(c in AR_DIGITS for c in head)
                 and 1 <= len(tail) <= 3 and tail[0] in AR_NONZERO
                 and all(c in AR_DIGITS for c in tail))
+    # lettre en queue (ordre direct)
+    digits, rest = _split_digits(s, AR_DIGITS)
+    if 3 <= len(digits) <= 5:
+        if rest in ("ا", "ب", "ت") or rest == "تت":
+            return True
     return False
+
+
+# --- Ligne complète : latin puis arabe, côte à côte -------------------------
+#
+# Format des plaques RECTANGULAIRES, lues d'un seul tenant : la frontière entre
+# les deux graphies est introuvable dans l'image (quatre méthodes de découpe
+# ont échoué), mais triviale dans le texte — les deux alphabets sont disjoints.
+# La grammaire compose donc les deux précédentes : un latin COMPLET, suivi d'un
+# arabe, avec en fin l'égalité des longueurs — les deux graphies portent le
+# même numéro, donc exactement autant de caractères (vérifié : écart nul sur
+# 96 000 plaques générées et sur toutes les plaques réelles mesurées).
+
+LATIN_SET = set("0123456789ABCDT")
+ARABIC_SET = set(AR_DIGITS) | set("جابت")
+
+
+def _couper_full(s: str) -> tuple[str, str]:
+    """Coupe au premier caractère arabe. Sur la plaque, le latin est à gauche."""
+    for i, c in enumerate(s):
+        if c in ARABIC_SET:
+            return s[:i], s[i:]
+    return s, ""
+
+
+def viable_full(s: str) -> bool:
+    lat, ara = _couper_full(s)
+    if ara == "":
+        return viable_latin(lat)
+    # Un caractère latin APRÈS le début de l'arabe est impossible : les deux
+    # blocs ne s'entrelacent jamais sur une plaque.
+    if any(c in LATIN_SET for c in ara):
+        return False
+    # L'arabe ne commence qu'une fois le latin terminé, et ne peut pas devenir
+    # plus long que lui (l'égalité est exigée à la complétion).
+    return complete_latin(lat) and viable_arabic(ara) and len(ara) <= len(lat)
+
+
+def complete_full(s: str) -> bool:
+    lat, ara = _couper_full(s)
+    if not ara or any(c in LATIN_SET for c in ara):
+        return False
+    return (complete_latin(lat) and complete_arabic(ara)
+            and len(lat) == len(ara))
 
 
 # --- Recherche en faisceau --------------------------------------------------
@@ -244,13 +312,31 @@ if __name__ == "__main__":
         (complete_latin, "3090TT", True), (complete_latin, "3044C", True),
         (complete_latin, "3TT", False), (complete_latin, "252D", False),
         (viable_arabic, "١٠٥", True), (viable_arabic, "١٠٥ج", True),
-        (viable_arabic, "١٠٥ج٢٥٢", True), (viable_arabic, "٠١٢", False),
+        # « ٠١٢ » est viable : l'ordre direct permet un nombre officiel, qui
+        # comme côté latin admet un zéro initial. Seul le privé l'interdit.
+        (viable_arabic, "١٠٥ج٢٥٢", True), (viable_arabic, "٠١٢", True),
         (viable_arabic, "تت", True), (viable_arabic, "ت٣٠٤٤", True),
+        # Ordre DIRECT (lettre en queue), observé sur « 3725 C » réelle.
+        (complete_arabic, "٣٧٢٥ت", True), (complete_arabic, "٤٤٩٥تت", True),
+        (complete_arabic, "١٦٣ج٦٩", True), (viable_arabic, "٣٧٢٥", True),
+        (complete_full, "3725C٣٧٢٥ت", True),
+        (complete_full, "163069١٦٣ج٦٩", True),
         (complete_arabic, "١٠٥ج٢٥٢", True), (complete_arabic, "تت٣٠٩٠", True),
         (complete_arabic, "ت٣٠٤٤", True), (complete_arabic, "١٠٥ج", False),
         # Plaque privée minimale : « 2 D 3 ». Un garde-fou trop strict sur la
         # longueur l'écartait, avec toutes celles du début de cycle.
         (complete_arabic, "٣ج٢", True), (complete_latin, "2D3", True),
+        # Lignes complètes (plaques rectangulaires) : latin puis arabe.
+        (complete_full, "163D69٦٩ج١٦٣", True),      # standard
+        (complete_full, "163069٦٩ج١٦٣", True),      # 7 segments : D gravé 0
+        (complete_full, "3044Cت٣٠٤٤", True),        # officiel
+        (complete_full, "3090TTتت٣٠٩٠", True),      # transit
+        (complete_full, "163D69٦٩ج١٦", False),      # longueurs inégales
+        (complete_full, "163D69", False),           # arabe absent
+        (viable_full, "163D69٦٩ج١٦", True),         # arabe en cours de lecture
+        (viable_full, "163", True),                 # latin en cours de lecture
+        (viable_full, "163D69٦٩ج١٦٣2", False),      # latin après l'arabe
+        (viable_full, "٦٩ج١٦٣", False),             # arabe sans latin devant
     ]
     for fn, s, want in cases:
         got = fn(s)
