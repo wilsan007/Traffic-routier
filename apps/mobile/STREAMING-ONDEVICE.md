@@ -2,12 +2,22 @@
 
 Deux modes terrain au-delà du scan photo → serveur :
 
-| | **Option 2 — Diffusion en direct** | **Option 3 — Scan hors-ligne (on-device)** |
-|---|---|---|
-| Écran | `app/live.tsx` | `app/offline-scan.tsx` |
-| Où tourne l'IA | serveur (pipeline complet : suivi ByteTrack + vote) | sur le téléphone (ML Kit) |
-| Réseau | requis (flux WebRTC) | fonctionne **hors-ligne**, sync différée |
-| Dépendance native | `react-native-webrtc` | `@react-native-ml-kit/text-recognition` |
+| | **Flux continu (on-device temps réel)** | **Diffusion en direct** | **Scan hors-ligne** |
+|---|---|---|---|
+| Écran | `app/stream-scan.tsx` | `app/live.tsx` | `app/offline-scan.tsx` |
+| Où tourne l'IA | téléphone, **image par image** (VisionCamera + ML Kit) | serveur (ByteTrack + vote) | téléphone (photo → ML Kit) |
+| Réseau | **hors-ligne**, sync différée | requis (WebRTC) | **hors-ligne**, sync différée |
+| Dépendance native | `react-native-vision-camera` + `-text-recognition` + `worklets-core` | `react-native-webrtc` | `@react-native-ml-kit/text-recognition` |
+
+### Flux continu (`/stream-scan`) — le vrai « flux de voitures »
+
+VisionCamera traite la caméra **frame par frame** via un frame processor ML Kit
+(pas de photo/obturateur). `lib/plateStreamVote.ts` applique un **consensus
+temporel** : une plaque n'est confirmée que si elle apparaît sur plusieurs
+frames (un vrai véhicule qui passe), avec cooldown anti-doublon et filtrage par
+format de plaque. Entièrement on-device → marche hors-ligne ; les plaques
+confirmées sont mises en file et synchronisées ensuite. Requiert le plugin
+babel `react-native-worklets-core/plugin` (déjà dans `babel.config.js`).
 
 > ⚠️ Ces deux fonctions utilisent des **modules natifs absents d'Expo Go**. Il
 > faut un **development build** (`npx expo run:android` ou un build EAS). Sans

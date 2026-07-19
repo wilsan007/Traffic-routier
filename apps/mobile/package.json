@@ -27,7 +27,10 @@
     "react-native": "0.81.5",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-vision-camera": "4.7.3",
+    "react-native-vision-camera-text-recognition": "3.1.1",
     "react-native-webrtc": "124.0.7",
+    "react-native-worklets-core": "1.6.3",
     "socket.io-client": "^4.8.0"
   },
   "devDependencies": {

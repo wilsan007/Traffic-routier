@@ -7,7 +7,9 @@ appId: local.trafficguard.mobile
 ---
 - launchApp
 - takeScreenshot: 01-launch
+- openLink: trafficguard://stream-scan
+- takeScreenshot: 02-stream-scan
 - openLink: trafficguard://offline-scan
-- takeScreenshot: 02-offline-scan
+- takeScreenshot: 03-offline-scan
 - openLink: trafficguard://live
-- takeScreenshot: 03-live
+- takeScreenshot: 04-live

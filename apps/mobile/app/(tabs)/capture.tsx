@@ -359,6 +359,9 @@ export default function CaptureScreen() {
           hors-ligne embarqué. Les écrans cibles gèrent la disponibilité des
           modules natifs (development build requis) et retombent proprement. */}
       <View style={styles.modeBar}>
+        <TouchableOpacity style={[styles.modeButton, styles.modeButtonHl]} onPress={() => router.push('/stream-scan')}>
+          <Text style={styles.modeButtonText}>🎥 Flux continu</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={styles.modeButton} onPress={() => router.push('/live')}>
           <Text style={styles.modeButtonText}>🔴 Direct</Text>
         </TouchableOpacity>
@@ -432,6 +435,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
+  modeButtonHl: { backgroundColor: 'rgba(47, 95, 219, 0.92)' },
   modeButtonText: { color: 'white', fontWeight: '600', fontSize: 13 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   permissionText: { textAlign: 'center', marginBottom: 16, color: '#334155' },
