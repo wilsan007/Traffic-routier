@@ -27,13 +27,23 @@
  * ci-dessous : élargir ces bornes « pour mieux capter » se mettrait à les
  * reconnaître, sans que rien ne le signale.
  *
- * ⚠️ Deux pièges vérifiés sur photos de plaques réelles :
+ * Deux formats physiques coexistent, et ils ne se valent pas à la lecture :
+ * le format CARRÉ porte le latin et l'arabe sur deux lignes superposées, le
+ * format RECTANGULAIRE les met sur une seule ligne, côte à côte. Mesuré sur
+ * photos réelles, le rectangulaire est nettement plus difficile : la frontière
+ * entre les deux graphies n'y est marquée par aucun blanc franc, alors que le
+ * carré offre une séparation horizontale nette.
+ *
+ * ⚠️ Trois pièges vérifiés sur photos de plaques réelles :
  *
  *   1. Deux polices coexistent, au choix du client. En police « digitale »
  *      (7 segments), le `D` est visuellement indiscernable d'un `0` : la même
  *      plaque `163 D 69` se lit `163069`. Voir `normalizeDjiboutiPlate`.
  *   2. La couleur du fond est porteuse de sens, pas décorative — un format
  *      A/B/C/D sur un fond non noir est suspect. Voir `isBackgroundSuspicious`.
+ *   3. Une plaque ne portant qu'une seule graphie est non conforme, et prive
+ *      la lecture de toute vérification croisée. Voir
+ *      `isSingleScriptSuspicious`.
  *
  * Module pur (aucune dépendance native) → testable en isolation.
  */
@@ -184,6 +194,37 @@ export function isBackgroundSuspicious(plate: string, observed: PlateBackground)
   const category = plateCategory(plate);
   if (!category) return false;
   return observed !== expectedBackground(category);
+}
+
+/** Ce que le lecteur est parvenu à lire sur la plaque. */
+export type ScriptsLus = { latin: boolean; arabe: boolean };
+
+/**
+ * Signale une plaque qui ne porte qu'une seule graphie.
+ *
+ * Une plaque djiboutienne est bilingue par construction : le même numéro y
+ * figure en latin ET en arabe. Une plaque n'en portant qu'une est donc
+ * non conforme — contrefaçon, plaque artisanale, ou graphie effacée.
+ *
+ * ⚠️ Le retour est `true` pour ANOMALIE À VÉRIFIER, jamais pour infraction
+ * établie, et la distinction est essentielle. Le lecteur ne sait pas faire la
+ * différence entre :
+ *
+ *   - la plaque ne porte effectivement qu'une graphie — non-conformité réelle ;
+ *   - l'autre graphie existe mais n'a pas été lue — angle, ombre portée, boue,
+ *     recadrage trop serré, ligne hors champ.
+ *
+ * Mesuré sur le corpus de photos réelles : deux plaques n'exposaient aucun
+ * arabe lisible, sans qu'on puisse trancher entre les deux causes. Verbaliser
+ * sur ce seul signal sanctionnerait un conducteur pour une plaque sale ou une
+ * photo mal cadrée. L'agent tranche, l'application signale.
+ *
+ * Conséquence pratique : ces plaques n'ont AUCUNE vérification croisée
+ * possible — leur numéro repose sur une lecture unique, donc sans filet. Elles
+ * méritent doublement un contrôle visuel.
+ */
+export function isSingleScriptSuspicious(lus: ScriptsLus): boolean {
+  return lus.latin !== lus.arabe;
 }
 
 /**
