@@ -49,7 +49,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, features
 
 # --- Format des plaques (voir apps/mobile/lib/djiboutiPlate.ts) ---------------
 #
@@ -200,9 +200,71 @@ def render_line(text: str, font: ImageFont.FreeTypeFont, red: bool,
     img = Image.new("RGB", (w, h), bg)
     d = ImageDraw.Draw(img)
 
-    # Marges variables : le découpage réel ne tombera jamais au pixel près.
-    x = rng.randint(10, 60)
-    d.text((x, h // 2), text, font=font, fill=fg, anchor="lm")
+    # La taille de police est CALCULÉE pour que le texte remplisse le cadre, et
+    # non fixée à l'avance. Mesuré : à taille fixe, le texte ne couvrait que
+    # ~55 % de la largeur et ~45 % de la hauteur, collé à gauche, le reste vide
+    # — alors qu'un recadrage réel est rempli à ~100 % × ~90 %. Le modèle
+    # atteignait 99,9 % en validation et lisait 0/4 vraies plaques : il avait
+    # appris « petits glyphes en haut à gauche », pas à lire.
+    #
+    # Ajuster à la boîte réelle du texte règle du même coup la disparité entre
+    # polices : Baghdad rend des glyphes bien plus petits qu'Arial à taille
+    # nominale égale, l'arabe se retrouvait deux fois moins haut que le latin.
+    # En partant de la boîte mesurée, la police utilisée n'importe plus.
+    # Plage centrée sur ce que valent les vrais recadrages (~77 % dans les deux
+    # axes, mesuré), et assez large pour couvrir un découpage plus lâche comme
+    # plus serré : c'est le pipeline qui recadre, et il ne sera jamais régulier.
+    target_w = int(w * rng.uniform(0.58, 0.88))
+    target_h = int(h * rng.uniform(0.52, 0.86))
+
+    # Chasse variable : les caractères sont posés un par un, avec une avance
+    # réduite ou élargie, au lieu d'être rendus d'un bloc.
+    #
+    # Mesuré sur le modèle entraîné sans cela : il lit « 5100103 » parfaitement
+    # à chasse normale, encore à 80 %, puis s'effondre — « 50003 » à 70 %,
+    # « 5000 » à 60 %. Or DSEG espace largement ses glyphes alors que les vraies
+    # plaques 7 segments sont gravées quasi jointives (vérifié sur la plaque
+    # « 510 D 103 » d'un Range Rover). Le modèle n'avait donc jamais vu de
+    # caractères serrés, et fusionnait ceux du réel.
+    tracking = rng.uniform(0.55, 1.10)
+    advances = [font.getlength(c) for c in text]
+
+    if sum(advances) > 0:
+        pad = int(font.size)
+        canvas_w = int(sum(advances) * tracking) + 2 * pad
+        canvas_h = 4 * pad
+        mask = Image.new("L", (canvas_w, canvas_h), 0)
+        md = ImageDraw.Draw(mask)
+        x = float(pad)
+        for ch, adv in zip(text, advances):
+            md.text((x, canvas_h // 2), ch, font=font, fill=255, anchor="lm")
+            x += adv * tracking
+        # Le masque est recadré sur l'encre puis redimensionné sur les DEUX axes
+        # indépendamment. Un facteur d'échelle commun couplerait largeur et
+        # hauteur : la dimension contraignante fixerait l'autre, qui
+        # sous-remplirait. Mesuré sur 3 000 images, l'arabe remplissait alors
+        # 71 % de la largeur pour 84 % de la hauteur, contre 85/84 pour le latin
+        # — la hampe descendante du `ج` rend la hauteur toujours contraignante.
+        # Les glyphes arabes sortaient plus hauts et plus étroits que sur les
+        # vraies plaques (~77/77), et le modèle échouait sur l'arabe réel alors
+        # qu'il lisait le latin.
+        #
+        # Passer par un masque rend en outre le résultat indépendant de la
+        # police : ce qui est ajusté est l'encre effectivement dessinée, pas une
+        # métrique typographique qui varie d'une fonte à l'autre.
+        bbox = mask.getbbox()
+        if bbox is None:
+            d.text((10, h // 2), text, font=font, fill=fg, anchor="lm")
+            return img
+        mask = mask.crop(bbox).resize((max(1, target_w), max(1, target_h)), Image.LANCZOS)
+
+        # Position libre dans le cadre : le découpage réel ne tombera jamais au
+        # pixel près.
+        x = rng.randint(0, max(0, w - target_w))
+        y = rng.randint(0, max(0, h - target_h))
+        img.paste(Image.new("RGB", mask.size, fg), (x, y), mask)
+    else:
+        d.text((10, h // 2), text, font=font, fill=fg, anchor="lm")
     return img
 
 
@@ -261,13 +323,36 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--count", type=int, default=20000)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--digital-font", type=Path, required=True)
-    ap.add_argument("--standard-font", type=Path, required=True)
-    ap.add_argument("--arabic-font", type=Path, default=None)
+    # Plusieurs polices par écriture, et non une seule.
+    #
+    # Mesuré : entraîné sur la seule Arial Bold, le modèle atteint 99 % en
+    # validation puis lit « 234D56 » 3 fois sur 10 en Verdana Bold et 0 sur 10
+    # en Impact. Il avait appris CETTE forme de « 2 », pas le concept. Comme la
+    # validation sort du même générateur — donc de la même police — rien ne le
+    # signalait. Les vraies plaques djiboutiennes n'étant dans aucune police
+    # système, c'est ce qui les rendait illisibles.
+    ap.add_argument("--digital-font", type=Path, required=True, nargs="+")
+    ap.add_argument("--standard-font", type=Path, required=True, nargs="+")
+    ap.add_argument("--arabic-font", type=Path, default=None, nargs="+")
     ap.add_argument("--digital-ratio", type=float, default=0.5,
                     help="Part de plaques en police 7 segments (part croissante du parc).")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
+
+    # `random_plate` construit l'arabe DÉJÀ dans son ordre visuel, en partant du
+    # principe que PIL le dessine tel quel. Ce n'est vrai qu'avec le moteur de
+    # rendu BASIC : compilé avec Raqm, PIL applique lui-même l'algorithme
+    # bidirectionnel et RE-inverse la chaîne. Les images porteraient alors un
+    # arabe à l'envers assorti d'un label correct — le modèle apprendrait
+    # l'inverse de la réalité, et rien dans les métriques ne le signalerait.
+    # On refuse plutôt que de produire un jeu silencieusement faux.
+    if features.check("raqm"):
+        raise SystemExit(
+            "PIL est compilé avec Raqm : il réordonnerait l'arabe déjà mis en "
+            "ordre visuel par random_plate(). Voir le commentaire ci-dessus — "
+            "il faut passer layout_engine=ImageFont.Layout.BASIC aux polices "
+            "avant de générer quoi que ce soit."
+        )
 
     rng = random.Random(args.seed)
     np.random.seed(args.seed)
@@ -275,9 +360,14 @@ def main() -> None:
     images = args.out / "images"
     images.mkdir(parents=True, exist_ok=True)
 
-    digital = ImageFont.truetype(str(args.digital_font), 74)
-    standard = ImageFont.truetype(str(args.standard_font), 82)
-    arabic = ImageFont.truetype(str(args.arabic_font), 52) if args.arabic_font else None
+    digital = [ImageFont.truetype(str(p), 74) for p in args.digital_font]
+    standard = [ImageFont.truetype(str(p), 82) for p in args.standard_font]
+    # L'arabe est rendu à une taille comparable au latin, et non plus petit.
+    # Le CRNN ramène la ligne de 640×128 à 192×48 : tout ce qui est rendu petit
+    # perd proportionnellement plus de détail au sous-échantillonnage. Or c'est
+    # l'arabe qui tranche l'ambiguïté `D`/`0` — le dégrader revient à priver le
+    # modèle de sa seule source de vérité sur les plaques 7 segments.
+    arabic = [ImageFont.truetype(str(p), 74) for p in args.arabic_font] if args.arabic_font else None
 
     labels_path = args.out / "labels.jsonl"
     with labels_path.open("w", encoding="utf-8") as fh:
@@ -291,10 +381,10 @@ def main() -> None:
             # soumettra chaque ligne séparément.
             if arabic is not None and rng.random() < 0.5:
                 text, script = plate.arabic, "arabic"
-                font = arabic
+                font = rng.choice(arabic)
             else:
                 text, script = plate.latin_glyphs(is_digital), "latin"
-                font = digital if is_digital else standard
+                font = rng.choice(digital if is_digital else standard)
 
             img = degrade(render_line(text, font, red, rng), rng)
 

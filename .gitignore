@@ -23,3 +23,7 @@ apps/mobile/.expo/
 # Voir apps/mobile/assets/models/README.md pour le recuperer.
 # A retirer d'ici quand un modele entraine par nos soins le remplacera.
 apps/mobile/assets/models/*.tflite
+
+# Jeu de plaques synthetiques : regenerable a l identique depuis
+# tools/plate-dataset/generate.py (meme --seed), donc jamais versionne.
+data/
