@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, ScrollView, Switch, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
@@ -11,6 +11,8 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { readLineFromJpegBase64 } from '../../lib/plateReaderOnnx';
 import { reconcile } from '../../lib/plateBilingue';
 import { addScan } from '../../lib/scanHistory';
+import { addSample, syncSamples } from '../../lib/trainingSamples';
+import { normalizeDjiboutiPlate } from '../../lib/djiboutiPlate';
 
 interface InfractionTypeOption {
   id: string;
@@ -260,13 +262,22 @@ export default function CaptureScreen() {
     plate: string | null;
     reason: string;
     brutes: string[];
+    /** Recadrages JPEG base64 alignés sur `brutes` — matière d'entraînement. */
+    crops: string[];
   }
   const [onDevice, setOnDevice] = useState<LectureEmbarquee | null>(null);
   const [onDeviceLoading, setOnDeviceLoading] = useState(false);
+  // Verdict de l'agent sur la lecture embarquée (boucle d'amélioration).
+  const [verdictFait, setVerdictFait] = useState(false);
+  const [enCorrection, setEnCorrection] = useState(false);
+  const [correction, setCorrection] = useState('');
 
   const lireSurAppareil = useCallback(async (uri: string) => {
     setOnDeviceLoading(true);
     setOnDevice(null);
+    setVerdictFait(false);
+    setEnCorrection(false);
+    setCorrection('');
     try {
       const reco = (await PhotoRecognizer({ uri })) as unknown as {
         blocks?: unknown;
@@ -305,6 +316,7 @@ export default function CaptureScreen() {
         .slice(0, 10);
 
       const brutes: string[] = [];
+      const crops: string[] = [];
       for (const z of zones) {
         // Marge autour de la boîte : mesuré en atelier, un recadrage collé au
         // texte fait perdre le premier caractère.
@@ -327,7 +339,10 @@ export default function CaptureScreen() {
         );
         if (!crop.base64) continue;
         const lu = await readLineFromJpegBase64(crop.base64);
-        if (lu) brutes.push(lu);
+        if (lu) {
+          brutes.push(lu);
+          crops.push(crop.base64);
+        }
       }
 
       // Une plaque rectangulaire tient dans UNE zone (latin+arabe côte à
@@ -337,18 +352,19 @@ export default function CaptureScreen() {
         plate: null,
         reason: brutes.length ? 'aucune concordance latin/arabe' : 'aucun texte lisible',
         brutes,
+        crops,
       };
       exterieur: for (let i = 0; i < brutes.length; i++) {
         const seul = reconcile(brutes[i]);
         if (seul.plate) {
-          verdict = { plate: seul.plate, reason: seul.reason, brutes };
+          verdict = { plate: seul.plate, reason: seul.reason, brutes, crops };
           break;
         }
         for (let j = 0; j < brutes.length; j++) {
           if (i === j) continue;
           const paire = reconcile(brutes[i] + brutes[j]);
           if (paire.plate) {
-            verdict = { plate: paire.plate, reason: paire.reason, brutes };
+            verdict = { plate: paire.plate, reason: paire.reason, brutes, crops };
             break exterieur;
           }
         }
@@ -365,11 +381,50 @@ export default function CaptureScreen() {
         plate: null,
         reason: e instanceof Error ? e.message : 'échec de la lecture embarquée',
         brutes: [],
+        crops: [],
       });
     } finally {
       setOnDeviceLoading(false);
     }
   }, []);
+
+  /**
+   * Verdict de l'agent — la moitié terrain de la boucle d'amélioration.
+   * Il est DEVANT le véhicule : son numéro certifié est la vérité terrain.
+   * L'échantillon part en file locale, envoyé dès que le réseau le permet ;
+   * le contrôle qualité et l'entraînement restent centraux.
+   */
+  const certifier = useCallback(
+    async (verdict: 'confirmee' | 'corrigee', plaqueSaisie?: string) => {
+      if (!onDevice) return;
+      let plaque = onDevice.plate;
+      if (verdict === 'corrigee') {
+        // La saisie de l'agent passe par le même normaliseur que les lectures :
+        // une correction hors format ne doit pas entrer dans la base.
+        const normalisee = normalizeDjiboutiPlate(plaqueSaisie ?? '', true);
+        if (!normalisee) {
+          setError('Format de plaque invalide — ex. 163D69, 1234A, 3090TT');
+          return;
+        }
+        plaque = normalisee;
+      }
+      if (!plaque) return;
+      setError(null);
+      await addSample({
+        at: Date.now(),
+        lectureApp: onDevice.plate,
+        brutes: onDevice.brutes,
+        crops: onDevice.crops,
+        verdict,
+        plaqueCertifiee: plaque,
+      }).catch(() => {});
+      setVerdictFait(true);
+      setEnCorrection(false);
+      // Tentative d'envoi opportuniste — la file retient ce qui ne part pas.
+      syncSamples().catch(() => {});
+    },
+    [onDevice],
+  );
 
   function reset() {
     setPhotoUri(null);
@@ -381,6 +436,9 @@ export default function CaptureScreen() {
     setLastAlert(null);
     setLivePlate(null);
     setOnDevice(null);
+    setVerdictFait(false);
+    setEnCorrection(false);
+    setCorrection('');
   }
 
   function resetContinuous() {
@@ -459,6 +517,54 @@ export default function CaptureScreen() {
                   </Text>
                 ))}
               </>
+            )}
+
+            {/* Verdict de l'agent : chaque contrôle devient une donnée
+                d'entraînement certifiée. Les corrections et les rejets sont
+                les échantillons les plus précieux — l'app n'apprend rien de
+                ce qu'elle sait déjà lire. */}
+            {verdictFait ? (
+              <Text style={styles.verdictMerci}>
+                🎓 Échantillon enregistré — il partira au serveur dès que le réseau le permet.
+              </Text>
+            ) : enCorrection ? (
+              <View style={styles.correctionRow}>
+                <TextInput
+                  style={styles.correctionInput}
+                  value={correction}
+                  onChangeText={setCorrection}
+                  placeholder="ex. 163D69"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={styles.verdictOk}
+                  onPress={() => certifier('corrigee', correction)}
+                >
+                  <Text style={styles.actionText}>Enregistrer</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.verdictRow}>
+                {onDevice.plate && (
+                  <TouchableOpacity style={styles.verdictOk} onPress={() => certifier('confirmee')}>
+                    <Text style={styles.actionText}>✓ Correcte</Text>
+                  </TouchableOpacity>
+                )}
+                {onDevice.crops.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.verdictCorriger}
+                    onPress={() => {
+                      setCorrection(onDevice.plate ?? '');
+                      setEnCorrection(true);
+                    }}
+                  >
+                    <Text style={styles.actionText}>
+                      {onDevice.plate ? '✏️ Corriger' : '✏️ Saisir la vraie plaque'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </View>
         )}
@@ -615,6 +721,23 @@ const styles = StyleSheet.create({
   actionText: { color: 'white', fontWeight: '600', fontSize: 16 },
   verbalizeButton: { backgroundColor: '#0f1f4a', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 12 },
   onDeviceButton: { backgroundColor: '#7a3fb8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
+  verdictRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  verdictOk: { flex: 1, backgroundColor: '#2e9e5b', borderRadius: 10, padding: 12, alignItems: 'center' },
+  verdictCorriger: { flex: 1, backgroundColor: '#b8860b', borderRadius: 10, padding: 12, alignItems: 'center' },
+  verdictMerci: { marginTop: 12, color: '#2e9e5b', fontWeight: '600' },
+  correctionRow: { flexDirection: 'row', gap: 10, marginTop: 12, alignItems: 'center' },
+  correctionInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#c3cad9',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    letterSpacing: 2,
+    backgroundColor: '#fff',
+    color: '#16213a',
+  },
   typeList: { backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
   typeItem: {
     flexDirection: 'row',

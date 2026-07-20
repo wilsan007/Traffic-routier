@@ -26,6 +26,7 @@ import {
   updateScan,
   clearScans,
 } from '../../lib/scanHistory';
+import { countPending, syncSamples } from '../../lib/trainingSamples';
 
 type Filtre = 'tout' | ScanStatus;
 
@@ -53,9 +54,12 @@ export default function HistoriqueScreen() {
   const [entries, setEntries] = useState<ScanEntry[]>([]);
   const [filtre, setFiltre] = useState<Filtre>('tout');
   const [busy, setBusy] = useState(false);
+  // File d'échantillons d'entraînement (verdicts de l'agent) en attente d'envoi.
+  const [nbEchantillons, setNbEchantillons] = useState(0);
 
   const reload = useCallback(() => {
     listScans().then(setEntries);
+    countPending().then(setNbEchantillons).catch(() => {});
   }, []);
 
   // Rechargé à chaque retour sur l'onglet : le flux continu écrit pendant
@@ -152,6 +156,26 @@ export default function HistoriqueScreen() {
         )}
       </View>
 
+      {/* File d'entraînement : les verdicts certifiés par l'agent, en attente
+          d'envoi vers la base centrale — même contrat hors-ligne que le reste. */}
+      {nbEchantillons > 0 && (
+        <View style={styles.entrainement}>
+          <Text style={styles.entrainementText}>
+            🎓 {nbEchantillons} échantillon(s) d’entraînement à envoyer
+          </Text>
+          <TouchableOpacity
+            style={styles.bouton}
+            onPress={async () => {
+              const r = await syncSamples();
+              reload();
+              Alert.alert('Entraînement', `${r.envoyes} envoyé(s), ${r.restants} en attente.`);
+            }}
+          >
+            <Text style={styles.boutonText}>Envoyer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <FlatList
         data={visibles}
         keyExtractor={(e) => e.id}
@@ -225,6 +249,17 @@ const styles = StyleSheet.create({
     borderColor: '#c3cad9',
   },
   boutonSecondaireText: { color: '#5a6478', fontSize: 13 },
+  entrainement: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: 12,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#efe6f7',
+  },
+  entrainementText: { flex: 1, fontSize: 13, color: '#5a3d78', fontWeight: '600' },
   ligne: {
     backgroundColor: '#fff',
     marginHorizontal: 12,
