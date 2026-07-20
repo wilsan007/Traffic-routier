@@ -19,8 +19,10 @@ déploiement.
 Il doit être remplacé par un modèle entraîné par nos soins avant toute mise en
 production. Le plan retenu :
 
-- **architecture** : YOLOX-Nano (Megvii) — licence **Apache 2.0**, usage
-  commercial libre, aucune obligation de publication ;
+- **architecture** : YOLOX-Nano (Megvii) ou RT-DETR (PaddleDetection) — les
+  deux en licence **Apache 2.0**, usage commercial libre, aucune obligation de
+  publication. Le critère non négociable est la licence : YOLOv8 (AGPL-3.0)
+  reste écarté, une app de police ne peut pas publier son code ;
 - **données** : datasets de plaques US/EU en **CC BY 4.0** — les plaques
   djiboutiennes suivent le standard européen depuis 2023 (520 × 110 mm,
   FE-Schrift, noir sur blanc), le transfert devrait donc être direct ;
