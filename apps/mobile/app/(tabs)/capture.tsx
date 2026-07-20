@@ -6,6 +6,11 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { api, API_URL, getToken } from '../../lib/api';
 import { getAlertsSocket } from '../../lib/socket';
+import { PhotoRecognizer } from 'react-native-vision-camera-text-recognition';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { readLineFromJpegBase64 } from '../../lib/plateReaderOnnx';
+import { reconcile } from '../../lib/plateBilingue';
+import { addScan } from '../../lib/scanHistory';
 
 interface InfractionTypeOption {
   id: string;
@@ -246,6 +251,126 @@ export default function CaptureScreen() {
     }
   }
 
+  // --- Lecture embarquée (CRNN bilingue) -----------------------------------
+  // ML Kit sert de LOCALISATEUR : il trouve les zones de texte même quand il
+  // les lit mal (sur la police 7 segments il sort du charabia, mais il trouve
+  // la zone). Le CRNN lit chaque zone, puis la vérification croisée
+  // latin/arabe ne laisse passer que les lectures concordantes.
+  interface LectureEmbarquee {
+    plate: string | null;
+    reason: string;
+    brutes: string[];
+  }
+  const [onDevice, setOnDevice] = useState<LectureEmbarquee | null>(null);
+  const [onDeviceLoading, setOnDeviceLoading] = useState(false);
+
+  const lireSurAppareil = useCallback(async (uri: string) => {
+    setOnDeviceLoading(true);
+    setOnDevice(null);
+    try {
+      const reco = (await PhotoRecognizer({ uri })) as unknown as {
+        blocks?: unknown;
+      };
+
+      // Les types du plugin sont des tuples approximatifs ; on extrait les
+      // cadres de ligne défensivement, quelle que soit la forme réelle.
+      type Cadre = { x: number; y: number; width: number; height: number };
+      const lignes: Cadre[] = [];
+      const visiter = (node: unknown) => {
+        if (Array.isArray(node)) {
+          for (const n of node) visiter(n);
+          return;
+        }
+        if (node && typeof node === 'object') {
+          const o = node as Record<string, unknown>;
+          const f = (o.lineFrame ?? o.blockFrame) as Cadre | undefined;
+          if (
+            f &&
+            typeof f.x === 'number' &&
+            typeof f.width === 'number' &&
+            f.width > 40 &&
+            f.width / Math.max(1, f.height) > 1.4
+          ) {
+            lignes.push(f);
+          }
+          for (const v of Object.values(o)) visiter(v);
+        }
+      };
+      visiter(reco.blocks);
+
+      // Bornage : chaque lecture coûte ~100 ms — dix zones suffisent, les
+      // plaques sont parmi les plus larges.
+      const zones = lignes
+        .sort((a, b) => b.width - a.width)
+        .slice(0, 10);
+
+      const brutes: string[] = [];
+      for (const z of zones) {
+        // Marge autour de la boîte : mesuré en atelier, un recadrage collé au
+        // texte fait perdre le premier caractère.
+        const mx = z.width * 0.12;
+        const my = z.height * 0.25;
+        const crop = await manipulateAsync(
+          uri,
+          [
+            {
+              crop: {
+                originX: Math.max(0, z.x - mx),
+                originY: Math.max(0, z.y - my),
+                width: z.width + 2 * mx,
+                height: z.height + 2 * my,
+              },
+            },
+            { resize: { width: 192, height: 48 } },
+          ],
+          { format: SaveFormat.JPEG, base64: true, compress: 0.9 },
+        );
+        if (!crop.base64) continue;
+        const lu = await readLineFromJpegBase64(crop.base64);
+        if (lu) brutes.push(lu);
+      }
+
+      // Une plaque rectangulaire tient dans UNE zone (latin+arabe côte à
+      // côte) ; une carrée est répartie sur DEUX zones superposées. On essaie
+      // donc chaque lecture seule, puis chaque paire.
+      let verdict: LectureEmbarquee = {
+        plate: null,
+        reason: brutes.length ? 'aucune concordance latin/arabe' : 'aucun texte lisible',
+        brutes,
+      };
+      exterieur: for (let i = 0; i < brutes.length; i++) {
+        const seul = reconcile(brutes[i]);
+        if (seul.plate) {
+          verdict = { plate: seul.plate, reason: seul.reason, brutes };
+          break;
+        }
+        for (let j = 0; j < brutes.length; j++) {
+          if (i === j) continue;
+          const paire = reconcile(brutes[i] + brutes[j]);
+          if (paire.plate) {
+            verdict = { plate: paire.plate, reason: paire.reason, brutes };
+            break exterieur;
+          }
+        }
+      }
+
+      setOnDevice(verdict);
+      if (verdict.plate) {
+        // Versée au journal en « hors ligne » : l'onglet Historique la
+        // re-vérifiera côté serveur en un bouton.
+        addScan({ plate: verdict.plate, at: Date.now(), status: 'offline' }).catch(() => {});
+      }
+    } catch (e) {
+      setOnDevice({
+        plate: null,
+        reason: e instanceof Error ? e.message : 'échec de la lecture embarquée',
+        brutes: [],
+      });
+    } finally {
+      setOnDeviceLoading(false);
+    }
+  }, []);
+
   function reset() {
     setPhotoUri(null);
     setResult(null);
@@ -255,6 +380,7 @@ export default function CaptureScreen() {
     setVideoUri(null);
     setLastAlert(null);
     setLivePlate(null);
+    setOnDevice(null);
   }
 
   function resetContinuous() {
@@ -297,6 +423,42 @@ export default function CaptureScreen() {
                   </Text>
                 ))}
               </View>
+            )}
+          </View>
+        )}
+        {/* Lecture embarquée : CRNN bilingue + vérification croisée, sans serveur */}
+        <TouchableOpacity
+          style={styles.onDeviceButton}
+          onPress={() => photoUri && lireSurAppareil(photoUri)}
+          disabled={onDeviceLoading}
+        >
+          {onDeviceLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.actionText}>🔤 Lire sur l’appareil (CRNN)</Text>
+          )}
+        </TouchableOpacity>
+        {onDevice && (
+          <View style={styles.resultCard}>
+            {onDevice.plate ? (
+              <>
+                <Text style={styles.plateText}>{onDevice.plate}</Text>
+                <Text style={styles.confidenceText}>
+                  ✅ Latin et arabe concordants — {onDevice.reason}
+                </Text>
+                <Text style={styles.matchTextMuted}>
+                  Versée à l’Historique (à re-vérifier en ligne).
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.matchTextMuted}>Lecture embarquée : {onDevice.reason}</Text>
+                {onDevice.brutes.map((b, i) => (
+                  <Text key={i} style={styles.matchTextMuted}>
+                    · {b}
+                  </Text>
+                ))}
+              </>
             )}
           </View>
         )}
@@ -452,6 +614,7 @@ const styles = StyleSheet.create({
   actionButton: { backgroundColor: '#2f5fdb', borderRadius: 12, padding: 16, alignItems: 'center' },
   actionText: { color: 'white', fontWeight: '600', fontSize: 16 },
   verbalizeButton: { backgroundColor: '#0f1f4a', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 12 },
+  onDeviceButton: { backgroundColor: '#7a3fb8', borderRadius: 12, padding: 14, alignItems: 'center', marginBottom: 12 },
   typeList: { backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0', marginBottom: 12 },
   typeItem: {
     flexDirection: 'row',
