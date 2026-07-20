@@ -11,6 +11,7 @@ import {
   extractCandidates,
   DEFAULT_PLATE_VOTE_CONFIG,
 } from '../lib/plateStreamVote';
+import { addScan, updateScan } from '../lib/scanHistory';
 
 // Le plugin n'exporte pas publiquement son type `Text` ; on modélise le minimum
 // consommé (chaque bloc reconnu fournit `resultText`).
@@ -70,8 +71,22 @@ export default function StreamScanScreen() {
     if (inFlightRef.current.has(plate)) return;
     inFlightRef.current.add(plate);
     setConfirmedCount((c) => c + 1);
-    const pending: FeedItem = { plate, at: Date.now(), status: 'checking' };
+    const at = Date.now();
+    const pending: FeedItem = { plate, at, status: 'checking' };
     setFeed((f) => [pending, ...f].slice(0, 30));
+
+    // Journal persistant AVANT la vérification serveur : le fil ci-dessus est
+    // éphémère, et sur le terrain le réseau n'est pas garanti. L'entrée naît
+    // en `offline` et sera promue par la réponse serveur — ainsi une coupure
+    // au mauvais moment laisse une trace re-vérifiable, jamais un trou.
+    const saved = await addScan({
+      plate,
+      at,
+      status: 'offline',
+      latitude: coordsRef.current?.latitude,
+      longitude: coordsRef.current?.longitude,
+    }).catch(() => null);
+
     try {
       const res = await api.post<ScanPlateResult>('/captures/scan-plate', {
         plate,
@@ -82,6 +97,7 @@ export default function StreamScanScreen() {
         const detail = res.hotlistAlerts.map((a) => a.hotlistEntry.reason).join(', ');
         const priority = res.hotlistAlerts[0]?.hotlistEntry.priority ?? '';
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'alert', detail } : it)));
+        if (saved) updateScan(saved.id, { status: 'alert', detail });
         Notifications.scheduleNotificationAsync({
           content: {
             title: `🚨 ${plate} — Liste de surveillance ${priority}`,
@@ -94,10 +110,14 @@ export default function StreamScanScreen() {
         const v = res.vehicleMatch;
         const detail = `${v.make ?? ''} ${v.model ?? ''}`.trim() + (v.stolen ? ' — ⚠️ VOLÉ' : '');
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: v.stolen ? 'alert' : 'known', detail } : it)));
+        if (saved) updateScan(saved.id, { status: v.stolen ? 'alert' : 'known', detail });
       } else {
         setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'clear' } : it)));
+        if (saved) updateScan(saved.id, { status: 'clear' });
       }
     } catch {
+      // L'entrée du journal reste en `offline` : re-vérifiable depuis
+      // l'onglet Historique dès que le réseau revient.
       setFeed((f) => f.map((it): FeedItem => (it.plate === plate && it.status === 'checking' ? { ...it, status: 'clear', detail: 'hors ligne' } : it)));
     } finally {
       // Laisse le cooldown du voteur gérer la re-vérification.
@@ -106,11 +126,30 @@ export default function StreamScanScreen() {
   }, []);
 
   // Callback OCR du plugin : appelé à chaque frame analysée.
+  // Le plugin natif Android renvoie UN objet { resultText, blocks } ; iOS (ou
+  // d'anciennes versions) peuvent renvoyer un tableau de blocs, et le mode
+  // translate une chaîne. On normalise toutes ces formes vers une liste de
+  // lignes de texte avant d'en extraire des plaques candidates.
   const onOcr = useCallback(
-    (data: string | OcrText[]) => {
-      if (!active || typeof data === 'string') return;
-      const lines = data.map((t) => t.resultText).filter(Boolean);
-      const candidates = extractCandidates(lines);
+    (data: unknown) => {
+      if (!active || data == null) return;
+
+      const lines: string[] = [];
+      const pushText = (s: unknown) => {
+        if (typeof s === 'string' && s.length > 0) lines.push(...s.split(/\r?\n/));
+      };
+      if (typeof data === 'string') {
+        pushText(data);
+      } else if (Array.isArray(data)) {
+        for (const block of data) pushText((block as OcrText)?.resultText);
+      } else if (typeof data === 'object') {
+        pushText((data as OcrText).resultText);
+      }
+
+      const clean = lines.map((l) => l.trim()).filter(Boolean);
+      if (clean.length === 0) return;
+
+      const candidates = extractCandidates(clean);
       const now = Date.now();
       const confirmed = voterRef.current.ingest(candidates, now);
       setTracked(voterRef.current.tracked);

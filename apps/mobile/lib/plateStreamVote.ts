@@ -9,6 +9,8 @@
  * Module pur (aucune dépendance native) → testable en isolation.
  */
 
+import { normalizeDjiboutiPlate } from './djiboutiPlate';
+
 export interface PlateVoteConfig {
   /** Nombre minimum de frames confirmant la plaque dans la fenêtre. */
   minSightings: number;
@@ -16,18 +18,12 @@ export interface PlateVoteConfig {
   windowMs: number;
   /** Durée pendant laquelle une plaque confirmée ne peut pas re-déclencher (ms). */
   cooldownMs: number;
-  /** Longueur minimale d'une plaque normalisée acceptable. */
-  minLength: number;
-  /** Longueur maximale d'une plaque normalisée acceptable. */
-  maxLength: number;
 }
 
 export const DEFAULT_PLATE_VOTE_CONFIG: PlateVoteConfig = {
   minSightings: 3,
   windowMs: 2500,
   cooldownMs: 8000,
-  minLength: 4,
-  maxLength: 10,
 };
 
 interface Sighting {
@@ -44,42 +40,36 @@ export interface ConfirmedPlate {
 
 /**
  * Normalise un fragment de texte en plaque candidate.
- * - Majuscules, suppression des caractères non alphanumériques.
- * - Corrige les confusions OCR fréquentes en contexte.
- * Retourne null si ce n'est pas une plaque plausible.
+ *
+ * Délègue au format national (voir `djiboutiPlate`) : c'est lui qui décide ce
+ * qui est une plaque. L'OCR embarqué lit tout le texte visible — panneaux,
+ * publicités, inscriptions sur les camions — et seule une validation de format
+ * stricte permet d'écarter ce bruit.
+ *
+ * Retourne null si ce n'est pas une plaque valide.
  */
-export function normalizePlateCandidate(
-  raw: string,
-  cfg: Pick<PlateVoteConfig, 'minLength' | 'maxLength'> = DEFAULT_PLATE_VOTE_CONFIG,
-): string | null {
-  if (!raw) return null;
-  const cleaned = raw
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '');
-  if (cleaned.length < cfg.minLength || cleaned.length > cfg.maxLength) return null;
-  // Une plaque plausible contient au moins un chiffre et au moins une lettre,
-  // ou est majoritairement numérique — mais rejette le texte purement alphabétique.
-  const hasDigit = /[0-9]/.test(cleaned);
-  if (!hasDigit) return null;
-  return cleaned;
+export function normalizePlateCandidate(raw: string, trusted = false): string | null {
+  return normalizeDjiboutiPlate(raw, trusted);
 }
 
 /**
  * Extrait les plaques candidates depuis les blocs de texte OCR d'une frame.
  * Chaque ligne/bloc est traité séparément car une plaque tient sur une ligne.
+ *
+ * `trusted` doit être vrai lorsque le texte provient d'une région déjà
+ * identifiée comme une plaque par le détecteur : le format s'autorise alors des
+ * corrections impossibles sur l'image entière (voir `normalizeDjiboutiPlate`).
  */
-export function extractCandidates(
-  texts: string[],
-  cfg: PlateVoteConfig = DEFAULT_PLATE_VOTE_CONFIG,
-): string[] {
+export function extractCandidates(texts: string[], trusted = false): string[] {
   const out = new Set<string>();
   for (const t of texts) {
-    // découpe sur les espaces/retours pour isoler les tokens plausibles,
-    // et tente aussi la ligne entière recollée.
-    const joined = normalizePlateCandidate(t, cfg);
+    // Une plaque est lue « 123 D 45 » : c'est la ligne entière recollée qui
+    // correspond, pas les tokens isolés. On tente quand même les tokens, au cas
+    // où l'OCR agrège la plaque avec du texte voisin sur la même ligne.
+    const joined = normalizePlateCandidate(t, trusted);
     if (joined) out.add(joined);
     for (const token of t.split(/\s+/)) {
-      const n = normalizePlateCandidate(token, cfg);
+      const n = normalizePlateCandidate(token, trusted);
       if (n) out.add(n);
     }
   }

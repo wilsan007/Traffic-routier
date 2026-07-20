@@ -16,3 +16,14 @@ __pycache__/
 storage/uploads/
 apps/mobile/.expo/
 .gstack/
+
+# Modeles TFLite de detection de plaques.
+# Le modele de validation actuel provient d'un depot sans licence declaree : il
+# sert uniquement a eprouver le pipeline en local et ne doit pas etre distribue.
+# Voir apps/mobile/assets/models/README.md pour le recuperer.
+# A retirer d'ici quand un modele entraine par nos soins le remplacera.
+apps/mobile/assets/models/*.tflite
+
+# Jeu de plaques synthetiques : regenerable a l identique depuis
+# tools/plate-dataset/generate.py (meme --seed), donc jamais versionne.
+data/

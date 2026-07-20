@@ -52,6 +52,10 @@ export default function TabsLayout() {
         options={{ title: 'Scanner', tabBarIcon: () => <Text>📷</Text> }}
       />
       <Tabs.Screen
+        name="historique"
+        options={{ title: 'Historique', tabBarIcon: () => <Text>🗂️</Text> }}
+      />
+      <Tabs.Screen
         name="search"
         options={{ title: 'Recherche', tabBarIcon: () => <Text>🔍</Text> }}
       />

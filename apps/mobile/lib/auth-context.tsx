@@ -13,6 +13,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+// L'API tourne sur le palier gratuit Render, qui met l'instance en veille apres
+// inactivite : le premier appel doit attendre un demarrage a froid de 30-60s.
+// Ajoute a cela le reseau mobile terrain, un timeout court rendait la connexion
+// tout simplement impossible ("Serveur injoignable") au premier lancement.
+const LOGIN_TIMEOUT_MS = 60_000;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
       }),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('ABORT_TIMEOUT')), 5000),
+        setTimeout(() => reject(new Error('ABORT_TIMEOUT')), LOGIN_TIMEOUT_MS),
       ),
     ]);
     await setToken(res.accessToken);

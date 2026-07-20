@@ -1,0 +1,1134 @@
+{
+ "_schema": "Chaque entree : source (photo dans le dossier de photos), plaque (numero reel), rotation (degres de redressement avant decoupe), latin/arabe {texte, boite [x,y,largeur,hauteur]}.  decrit les GLYPHES graves — le D des 7 segments s y ecrit 0 — et l arabe est en ordre VISUEL (gauche a droite tel qu il apparait).  vaut null quand la plaque n en porte pas de lisible.",
+ "_ecartees": {
+  "3626_0": "trop floue, chiffres indechiffrables",
+  "3628_0": "recadrage rate, ne contient pas la plaque",
+  "3631_0": "hesitation sur le suffixe (761D56 ou 761D560)",
+  "3638_0": "flou de mouvement, 77081 incertain",
+  "3641_0": "hesitation entre 380102 et 386102",
+  "3647_0": "hesitation sur le prefixe (273 ou 873)",
+  "618-2_0": "latin dit 164, arabe semble dire 194 : desaccord non tranche",
+  "638-2_0": "trop floue (48088 ?)",
+  "641-2_0": "hesitation (3160189, decoupage incertain)",
+  "643-3_0": "arabe seul, pas de latin dans le recadrage",
+  "3625_0": "arabe illisible avec certitude (ordre et lettre indecis sur le recadrage) : plaque 2887C ecartee plutot qu'annotee au juge"
+ },
+ "plaques": {
+  "3614_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.14.jpeg",
+   "plaque": "43D94",
+   "rotation": 0,
+   "latin": {
+    "texte": "43D94",
+    "boite": [
+     368,
+     214,
+     151,
+     99
+    ]
+   },
+   "arabe": {
+    "texte": "٩٤ج٤٣",
+    "boite": [
+     519,
+     214,
+     119,
+     99
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3617_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.17.jpeg",
+   "plaque": "203D95",
+   "rotation": 0,
+   "latin": {
+    "texte": "203D95",
+    "boite": [
+     165,
+     370,
+     135,
+     49
+    ]
+   },
+   "arabe": {
+    "texte": "٩٥ج٢٠٣",
+    "boite": [
+     300,
+     370,
+     107,
+     49
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3618_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.18.jpeg",
+   "plaque": "203D95",
+   "rotation": 0,
+   "latin": {
+    "texte": "203D95",
+    "boite": [
+     142,
+     525,
+     128,
+     46
+    ]
+   },
+   "arabe": {
+    "texte": "٩٥ج٢٠٣",
+    "boite": [
+     270,
+     525,
+     102,
+     46
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3620_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.20.jpeg",
+   "plaque": "3725C",
+   "rotation": 0,
+   "latin": {
+    "texte": "3725C",
+    "boite": [
+     258,
+     358,
+     226,
+     62
+    ]
+   },
+   "arabe": {
+    "texte": "٣٧٢٥ت",
+    "boite": [
+     484,
+     358,
+     178,
+     62
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3628_1": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.28.jpeg",
+   "plaque": "905D91",
+   "rotation": 0,
+   "latin": {
+    "texte": "905091",
+    "boite": [
+     671,
+     379,
+     98,
+     35
+    ]
+   },
+   "arabe": {
+    "texte": "٩١ج٩٠٥",
+    "boite": [
+     671,
+     407,
+     98,
+     35
+    ]
+   },
+   "format": "carre"
+  },
+  "3629_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.29.jpeg",
+   "plaque": "810D94",
+   "rotation": 0,
+   "latin": {
+    "texte": "810D94",
+    "boite": [
+     715,
+     476,
+     100,
+     41
+    ]
+   },
+   "arabe": {
+    "texte": "٩٤ج٨١٠",
+    "boite": [
+     815,
+     476,
+     80,
+     41
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3630_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.30.jpeg",
+   "plaque": "930D68",
+   "rotation": 0,
+   "latin": {
+    "texte": "930D68",
+    "boite": [
+     351,
+     321,
+     98,
+     34
+    ]
+   },
+   "arabe": {
+    "texte": "٦٨ج٩٣٠",
+    "boite": [
+     351,
+     349,
+     98,
+     34
+    ]
+   },
+   "format": "carre"
+  },
+  "3634_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.34.jpeg",
+   "plaque": "759D92",
+   "rotation": 0,
+   "latin": {
+    "texte": "759D92",
+    "boite": [
+     344,
+     346,
+     128,
+     40
+    ]
+   },
+   "arabe": {
+    "texte": "٩٢ج٧٥٩",
+    "boite": [
+     472,
+     346,
+     101,
+     40
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3636_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.36.jpeg",
+   "plaque": "759D92",
+   "rotation": 0,
+   "latin": {
+    "texte": "759D92",
+    "boite": [
+     356,
+     304,
+     148,
+     39
+    ]
+   },
+   "arabe": {
+    "texte": "٩٢ج٧٥٩",
+    "boite": [
+     504,
+     304,
+     117,
+     39
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3639_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.39.jpeg",
+   "plaque": "841D94",
+   "rotation": 0,
+   "latin": {
+    "texte": "841094",
+    "boite": [
+     199,
+     369,
+     165,
+     115
+    ]
+   },
+   "arabe": {
+    "texte": "٩٤ج٨٤١",
+    "boite": [
+     199,
+     463,
+     165,
+     112
+    ]
+   },
+   "format": "carre"
+  },
+  "3640_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.40.jpeg",
+   "plaque": "830D100",
+   "rotation": 0,
+   "latin": {
+    "texte": "830D100",
+    "boite": [
+     359,
+     407,
+     101,
+     34
+    ]
+   },
+   "arabe": {
+    "texte": "١٠٠ج٨٣٠",
+    "boite": [
+     359,
+     435,
+     101,
+     34
+    ]
+   },
+   "format": "carre"
+  },
+  "3643_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.43.jpeg",
+   "plaque": "61D75",
+   "rotation": 0,
+   "latin": {
+    "texte": "61075",
+    "boite": [
+     435,
+     422,
+     89,
+     56
+    ]
+   },
+   "arabe": {
+    "texte": "٧٥ج٦١",
+    "boite": [
+     524,
+     422,
+     71,
+     56
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3644_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.44.jpeg",
+   "plaque": "251D88",
+   "rotation": 0,
+   "latin": {
+    "texte": "251088",
+    "boite": [
+     632,
+     191,
+     131,
+     49
+    ]
+   },
+   "arabe": {
+    "texte": "٨٨ج٢٥١",
+    "boite": [
+     763,
+     191,
+     103,
+     49
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3645_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.45.jpeg",
+   "plaque": "711D99",
+   "rotation": 0,
+   "latin": {
+    "texte": "711D99",
+    "boite": [
+     314,
+     273,
+     90,
+     26
+    ]
+   },
+   "arabe": {
+    "texte": "٩٩ج٧١١",
+    "boite": [
+     314,
+     294,
+     90,
+     26
+    ]
+   },
+   "format": "carre"
+  },
+  "3648_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.48.jpeg",
+   "plaque": "950D112",
+   "rotation": 0,
+   "latin": {
+    "texte": "9500112",
+    "boite": [
+     462,
+     450,
+     105,
+     41
+    ]
+   },
+   "arabe": {
+    "texte": "١١٢ج٩٥٠",
+    "boite": [
+     567,
+     450,
+     83,
+     41
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "3649_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.49.jpeg",
+   "plaque": "426D100",
+   "rotation": 0,
+   "latin": {
+    "texte": "4260100",
+    "boite": [
+     509,
+     339,
+     195,
+     64
+    ]
+   },
+   "arabe": {
+    "texte": "١٠٠ج٤٢٦",
+    "boite": [
+     509,
+     392,
+     195,
+     63
+    ]
+   },
+   "format": "carre"
+  },
+  "629-2_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.29-2.jpeg",
+   "plaque": "446D105",
+   "rotation": 0,
+   "latin": {
+    "texte": "4460105",
+    "boite": [
+     550,
+     257,
+     90,
+     30
+    ]
+   },
+   "arabe": {
+    "texte": "١٠٥ج٤٤٦",
+    "boite": [
+     550,
+     281,
+     90,
+     30
+    ]
+   },
+   "format": "carre"
+  },
+  "629-3_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.29-3.jpeg",
+   "plaque": "454D79",
+   "rotation": 0,
+   "latin": {
+    "texte": "454079",
+    "boite": [
+     458,
+     334,
+     60,
+     24
+    ]
+   },
+   "arabe": {
+    "texte": "٧٩ج٤٥٤",
+    "boite": [
+     518,
+     334,
+     48,
+     24
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "636-2_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.36-2.jpeg",
+   "plaque": "85D113",
+   "rotation": 0,
+   "latin": {
+    "texte": "850113",
+    "boite": [
+     491,
+     513,
+     104,
+     33
+    ]
+   },
+   "arabe": {
+    "texte": "١١٣ج٨٥",
+    "boite": [
+     595,
+     513,
+     82,
+     33
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "643-2_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.43-2.jpeg",
+   "plaque": "764D91",
+   "rotation": 0,
+   "latin": {
+    "texte": "764091",
+    "boite": [
+     590,
+     367,
+     121,
+     44
+    ]
+   },
+   "arabe": {
+    "texte": "٩١ج٧٦٤",
+    "boite": [
+     590,
+     403,
+     121,
+     43
+    ]
+   },
+   "format": "carre"
+  },
+  "648-2_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.48-2.jpeg",
+   "plaque": "222D86",
+   "rotation": 0,
+   "latin": {
+    "texte": "222086",
+    "boite": [
+     435,
+     237,
+     117,
+     56
+    ]
+   },
+   "arabe": {
+    "texte": "٨٦ج٢٢٢",
+    "boite": [
+     552,
+     237,
+     93,
+     56
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "bus_2320C": {
+   "source": "D0JgVmrX0AAJfKJ.jpg",
+   "plaque": "2320C",
+   "rotation": 0,
+   "latin": {
+    "texte": "2320C",
+    "boite": [
+     357,
+     742,
+     85,
+     21
+    ]
+   },
+   "arabe": {
+    "texte": "ت٢٣٢٠",
+    "boite": [
+     354,
+     762,
+     88,
+     21
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_243D49": {
+   "source": "dji-july2021.jpg",
+   "plaque": "243D49",
+   "rotation": 2.5,
+   "latin": {
+    "texte": "243D49",
+    "boite": [
+     35,
+     266,
+     330,
+     80
+    ]
+   },
+   "arabe": {
+    "texte": "٤٩ج٢٤٣",
+    "boite": [
+     35,
+     348,
+     330,
+     86
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_253D37": {
+   "source": "dji-july2021.jpg",
+   "plaque": "253D37",
+   "rotation": 0.5,
+   "latin": {
+    "texte": "253D37",
+    "boite": [
+     410,
+     22,
+     355,
+     74
+    ]
+   },
+   "arabe": {
+    "texte": "٣٧ج٢٥٣",
+    "boite": [
+     410,
+     98,
+     355,
+     80
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_253D37r": {
+   "source": "dji-july2021.jpg",
+   "plaque": "253D37",
+   "rotation": 0.5,
+   "latin": {
+    "texte": "253D37",
+    "boite": [
+     135,
+     1078,
+     263,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "٣٧ج٢٥٣",
+    "boite": [
+     404,
+     1078,
+     300,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "dji_285D35": {
+   "source": "dji-july2021.jpg",
+   "plaque": "285D35",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "285D35",
+    "boite": [
+     410,
+     711,
+     355,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٣٥ج٢٨٥",
+    "boite": [
+     410,
+     796,
+     355,
+     88
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_430D40": {
+   "source": "dji-july2021.jpg",
+   "plaque": "430D40",
+   "rotation": -2.0,
+   "latin": {
+    "texte": "430D40",
+    "boite": [
+     25,
+     716,
+     325,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٤٠ج٤٣٠",
+    "boite": [
+     25,
+     798,
+     325,
+     88
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_615D43": {
+   "source": "dji-july2021.jpg",
+   "plaque": "615D43",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "615D43",
+    "boite": [
+     415,
+     483,
+     350,
+     82
+    ]
+   },
+   "arabe": {
+    "texte": "٤٣ج٦١٥",
+    "boite": [
+     415,
+     568,
+     350,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_892D27": {
+   "source": "dji-july2021.jpg",
+   "plaque": "892D27",
+   "rotation": -1.5,
+   "latin": {
+    "texte": "892D27",
+    "boite": [
+     38,
+     493,
+     322,
+     80
+    ]
+   },
+   "arabe": {
+    "texte": "٢٧ج٨٩٢",
+    "boite": [
+     38,
+     573,
+     322,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_892D27r": {
+   "source": "dji-july2021.jpg",
+   "plaque": "892D27",
+   "rotation": 1.0,
+   "latin": {
+    "texte": "892D27",
+    "boite": [
+     140,
+     938,
+     258,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "٢٧ج٨٩٢",
+    "boite": [
+     404,
+     938,
+     288,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "dji_909D34": {
+   "source": "dji-july2021.jpg",
+   "plaque": "909D34",
+   "rotation": -1.0,
+   "latin": {
+    "texte": "909D34",
+    "boite": [
+     30,
+     25,
+     350,
+     78
+    ]
+   },
+   "arabe": {
+    "texte": "٣٤ج٩٠٩",
+    "boite": [
+     30,
+     105,
+     350,
+     78
+    ]
+   },
+   "format": "carre"
+  },
+  "dji_930D34": {
+   "source": "dji-july2021.jpg",
+   "plaque": "930D34",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "930D34",
+    "boite": [
+     415,
+     256,
+     350,
+     84
+    ]
+   },
+   "arabe": {
+    "texte": "٣٤ج٩٣٠",
+    "boite": [
+     415,
+     343,
+     350,
+     84
+    ]
+   },
+   "format": "carre"
+  },
+  "i3_163D69_7seg": {
+   "source": "images-3.jpeg",
+   "plaque": "163D69",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "163069",
+    "boite": [
+     25,
+     55,
+     265,
+     70
+    ]
+   },
+   "arabe": {
+    "texte": "١٦٣ج٦٩",
+    "boite": [
+     290,
+     55,
+     245,
+     70
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "i3_163D69_std": {
+   "source": "images-3.jpeg",
+   "plaque": "163D69",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "163D69",
+    "boite": [
+     25,
+     175,
+     270,
+     72
+    ]
+   },
+   "arabe": {
+    "texte": "١٦٣ج٦٩",
+    "boite": [
+     295,
+     175,
+     245,
+     72
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "ic_4495TT": {
+   "source": "images copie.jpeg",
+   "plaque": "4495TT",
+   "rotation": -1.0,
+   "latin": {
+    "texte": "4495TT",
+    "boite": [
+     17,
+     24,
+     88,
+     30
+    ]
+   },
+   "arabe": {
+    "texte": "تت٤٤٩٥",
+    "boite": [
+     105,
+     24,
+     66,
+     30
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "ic_875D75": {
+   "source": "images copie.jpeg",
+   "plaque": "875D75",
+   "rotation": 0.0,
+   "latin": {
+    "texte": "875D75",
+    "boite": [
+     47,
+     64,
+     90,
+     27
+    ]
+   },
+   "arabe": {
+    "texte": "٧٥ج٨٧٥",
+    "boite": [
+     47,
+     92,
+     80,
+     25
+    ]
+   },
+   "format": "carre"
+  },
+  "images1_25D38": {
+   "source": "images-1.jpeg",
+   "plaque": "25D38",
+   "rotation": 0,
+   "latin": {
+    "texte": "25038",
+    "boite": [
+     110,
+     57,
+     93,
+     27
+    ]
+   },
+   "arabe": {
+    "texte": "٣٨ج٢٥",
+    "boite": [
+     110,
+     81,
+     93,
+     26
+    ]
+   },
+   "format": "carre"
+  },
+  "images_234D56": {
+   "source": "images.png",
+   "plaque": "234D56",
+   "rotation": 0,
+   "latin": {
+    "texte": "234D56",
+    "boite": [
+     14,
+     20,
+     300,
+     68
+    ]
+   },
+   "arabe": {
+    "texte": "٥٦ج٢٣٤",
+    "boite": [
+     14,
+     86,
+     300,
+     64
+    ]
+   },
+   "format": "carre"
+  },
+  "pl_243D95": {
+   "source": "plaque-d-immatriculation-194054.jpg",
+   "plaque": "243D95",
+   "rotation": -3.4,
+   "latin": {
+    "texte": "243095",
+    "boite": [
+     60,
+     25,
+     155,
+     42
+    ]
+   },
+   "arabe": {
+    "texte": "٩٥ج٢٤٣",
+    "boite": [
+     212,
+     32,
+     120,
+     36
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "pl_3090TT": {
+   "source": "plaque-d-immatriculation-194054.jpg",
+   "plaque": "3090TT",
+   "rotation": -1.0,
+   "latin": {
+    "texte": "3090TT",
+    "boite": [
+     198,
+     136,
+     160,
+     48
+    ]
+   },
+   "arabe": {
+    "texte": "تت٣٠٩٠",
+    "boite": [
+     198,
+     186,
+     160,
+     42
+    ]
+   },
+   "format": "carre"
+  },
+  "pl_931D61": {
+   "source": "plaque-d-immatriculation-194054.jpg",
+   "plaque": "931D61",
+   "rotation": -1.8,
+   "latin": {
+    "texte": "931061",
+    "boite": [
+     26,
+     133,
+     168,
+     46
+    ]
+   },
+   "arabe": {
+    "texte": "٦١ج٩٣١",
+    "boite": [
+     26,
+     176,
+     168,
+     42
+    ]
+   },
+   "format": "carre"
+  },
+  "pl_969D97": {
+   "source": "plaque-d-immatriculation-194054.jpg",
+   "plaque": "969D97",
+   "rotation": -5.1,
+   "latin": {
+    "texte": "969097",
+    "boite": [
+     55,
+     75,
+     160,
+     45
+    ]
+   },
+   "arabe": {
+    "texte": "٩٧ج٩٦٩",
+    "boite": [
+     212,
+     82,
+     130,
+     40
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "vt_252D105": {
+   "source": "vente-de-plaques-dimmatriculation-qualite-garantie-Vjp-284953.jpg",
+   "plaque": "252D105",
+   "rotation": -0.6,
+   "latin": {
+    "texte": "252D105",
+    "boite": [
+     58,
+     355,
+     457,
+     140
+    ]
+   },
+   "arabe": {
+    "texte": "١٠٥ج٢٥٢",
+    "boite": [
+     125,
+     495,
+     335,
+     83
+    ]
+   },
+   "format": "carre"
+  },
+  "vt_3044C": {
+   "source": "vente-de-plaques-dimmatriculation-qualite-garantie-Vjp-284953.jpg",
+   "plaque": "3044C",
+   "rotation": -0.5,
+   "latin": {
+    "texte": "3044C",
+    "boite": [
+     168,
+     28,
+     377,
+     104
+    ]
+   },
+   "arabe": {
+    "texte": "ت٣٠٤٤",
+    "boite": [
+     548,
+     40,
+     357,
+     75
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "vt_669D53": {
+   "source": "vente-de-plaques-dimmatriculation-qualite-garantie-Vjp-284953.jpg",
+   "plaque": "669D53",
+   "rotation": 0.8,
+   "latin": {
+    "texte": "669D53",
+    "boite": [
+     162,
+     210,
+     386,
+     115
+    ]
+   },
+   "arabe": {
+    "texte": "٥٣ج٦٦٩",
+    "boite": [
+     552,
+     228,
+     353,
+     77
+    ]
+   },
+   "format": "rectangulaire"
+  },
+  "vt_724D53": {
+   "source": "vente-de-plaques-dimmatriculation-qualite-garantie-Vjp-284953.jpg",
+   "plaque": "724D53",
+   "rotation": -0.8,
+   "latin": {
+    "texte": "724053",
+    "boite": [
+     585,
+     350,
+     400,
+     125
+    ]
+   },
+   "arabe": {
+    "texte": "٥٣ج٧٢٤",
+    "boite": [
+     595,
+     498,
+     370,
+     84
+    ]
+   },
+   "format": "carre"
+  }
+ },
+ "_anomalies": {
+  "3642_0": {
+   "source": "WhatsApp Image 2026-07-19 at 14.36.42.jpeg",
+   "plaque": "583D74",
+   "motif": "graphie unique (aucun arabe lisible) : plaque non conforme, a signaler pour verification. Exclue de l entrainement car non representative, et sans verification croisee possible."
+  },
+  "rr_510D103": {
+   "source": "images-2.jpeg",
+   "plaque": "510D103",
+   "motif": "graphie unique (aucun arabe lisible) : plaque non conforme, a signaler pour verification. Exclue de l entrainement car non representative, et sans verification croisee possible."
+  }
+ }
+}
